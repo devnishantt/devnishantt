@@ -75,8 +75,8 @@ PROFILE_QUERY = """
 query($login: String!) { user(login: $login) {
   createdAt
   contributionsCollection { contributionCalendar { totalContributions } }
-  repositories(ownerAffiliations: OWNER, isFork: false, first: 100) {
-    nodes { languages(first: 10) { edges { size node { name color } } } }
+  repositories(ownerAffiliations: OWNER, isFork: false, first: 100, orderBy: {field: PUSHED_AT, direction: DESC}) {
+    nodes { name languages(first: 10) { edges { size node { name color } } } }
   }
 } }"""
 
@@ -114,14 +114,16 @@ def fetch_prs(token: str, user: str) -> list[dict]:
 
 def fetch_profile(token: str, user: str) -> dict:
     u = gql(token, PROFILE_QUERY, {"login": user})["user"]
+    # The profile repository itself is not a project.
+    repos = [r for r in u["repositories"]["nodes"] if r["name"].lower() != user.lower()]
     langs: dict[str, list] = {}
-    for repo in u["repositories"]["nodes"]:
+    for repo in repos:
         for e in repo["languages"]["edges"]:
             entry = langs.setdefault(e["node"]["name"], [0, e["node"]["color"] or GREY])
             entry[0] += e["size"]
     total = sum(v[0] for v in langs.values()) or 1
     top = sorted(langs.items(), key=lambda kv: -kv[1][0])
-    return {"since": u["createdAt"][:4],
+    return {"since": u["createdAt"][:4], "repos": [r["name"] for r in repos],
             "contributions": u["contributionsCollection"]["contributionCalendar"]["totalContributions"],
             "languages": [(name, size / total, color) for name, (size, color) in top if size / total >= 0.005]}
 
@@ -227,16 +229,21 @@ def starfield(w: int, h: int, count: int, seed: int) -> str:
 def build_hero(st: dict, prof: dict, user: str, avatar: str | None) -> str:
     W, H, fs, lh, x0, y0 = 960, 300, 14, 26, 314, 98
     cw = fs * 0.62
+    listing = ""
+    for name in prof["repos"]:
+        candidate = f"{listing}  {name}".strip()
+        if len(candidate) > 62:
+            listing += "  …"
+            break
+        listing = candidate
     lines = [
         ("cmd", "whoami"),
-        ("out", [("Nishant", "name"), (" · backend developer · open-source contributor since "
-                                        f"{prof['since']}", "txt")]),
-        ("cmd", "cat focus.txt"),
-        ("out", [("APIs and services in TypeScript and Node.js, small well-tested OSS fixes", "txt")]),
-        ("cmd", "gh pr stats --author @me"),
-        ("out", [("● ", "mg"), (f"{st['merged']} merged   ", "txt"), ("● ", "op"), (f"{st['open']} in review   ", "txt"),
-                 ("◆ ", "cy"), (f"{len(st['projects'])} projects   ", "txt"), ("★ ", "yl"),
-                 (f"{human(st['reach'])} stars reached", "txt")]),
+        ("out", [("Nishant", "name"), (" · backend developer · TypeScript & Node.js", "txt")]),
+        ("cmd", "ls ~/projects"),
+        ("out", [(listing, "cy")]),
+        ("cmd", "cat stats.txt"),
+        ("out", [("● ", "mg"), (f"{len(prof['repos'])} repositories   ", "txt"), ("● ", "op"),
+                 (f"{prof['contributions']} contributions in the past year", "txt")]),
     ]
     t, timing = 0.6, []
     for kind, content in lines:
@@ -286,7 +293,7 @@ def build_hero(st: dict, prof: dict, user: str, avatar: str | None) -> str:
     face = (f'<image href="{avatar}" x="{acx - ar}" y="{acy - ar}" width="{2 * ar}" height="{2 * ar}" '
             f'clip-path="url(#av)" preserveAspectRatio="xMidYMid slice"/>' if avatar else
             f'<text x="{acx}" y="{acy + 22}" text-anchor="middle" class="mono-big">N</text>')
-    return f"""{svg_open(W, H, f"Terminal intro for {user}: {st['merged']} merged pull requests, {st['open']} in review, {len(st['projects'])} projects")}
+    return f"""{svg_open(W, H, f"Terminal intro for {user}: backend developer, {len(prof['repos'])} repositories")}
 <style>
   .m{{font:{fs}px {MONO};white-space:pre}} .pr{{fill:{VIOLET};font-weight:700}} .cmd{{fill:#e6edf3}}
   .txt{{fill:#c9d1d9}} .name{{fill:{CYAN};font-weight:700}} .mg{{fill:{VIOLET}}} .op{{fill:{GREEN}}}
@@ -378,7 +385,7 @@ def build_orbit(st: dict, sun: str | None, avatars: dict[str, str | None]) -> st
 {sun_face}
 <g transform="rotate(-8 {cx} {cy})">{''.join(planets)}</g>
 <line x1="580" y1="34" x2="580" y2="{H - 34}" stroke="#30363d"/>
-<text x="606" y="58" class="t">Open-source orbit</text>
+<text x="606" y="58" class="t">Projects I contribute to</text>
 <text x="606" y="80" class="s"><tspan fill="{VIOLET}">●</tspan> merged    <tspan fill="{GREEN}">●</tspan> in review    · planet size = stars</text>
 {''.join(legend)}
 </svg>
