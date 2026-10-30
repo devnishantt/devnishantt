@@ -643,7 +643,7 @@ def build_access_log(log: dict, user: str) -> str:
 <rect x=".5" y=".5" width="{W - 1}" height="{H - 1}" rx="20" fill="none" stroke="#30363d"/>
 <text x="34" y="44" class="h"><tspan fill="{VIOLET}">❯</tspan> tail -f /var/log/{esc(user)}/access.log</text>
 <circle cx="{W - 186}" cy="40" r="4" fill="{GREEN}"><animate attributeName="opacity" values="1;.2;1" dur="1.6s" repeatCount="indefinite"/></circle>
-<text x="{W - 40}" y="44" class="cnt" text-anchor="end">{log['served']:,} requests served</text>
+<text x="{W - 40}" y="44" class="cnt" text-anchor="end">{log['served']:,} request{'' if log['served'] == 1 else 's'} served</text>
 <line x1="20" y1="64" x2="{W - 20}" y2="64" stroke="#21262d"/>
 <text x="40" y="84" class="hd">TIME</text><text x="186" y="84" class="hd">CALLER</text><text x="330" y="84" class="hd">REQUEST</text>
 <text x="{W - 167}" y="84" class="hd" text-anchor="middle">STATUS</text><text x="{W - 40}" y="84" class="hd" text-anchor="end">REPLIED IN</text>
