@@ -35,7 +35,7 @@
 
 <!-- oss:start -->
 
-**1 merged · 9 in review · 9 projects · 29.8k combined stars**
+**1 merged · 10 in review · 10 projects · 31.6k combined stars**
 
 #### 🟣 Merged
 
@@ -50,6 +50,7 @@
 | <img src="https://github.com/processing.png?size=40" width="16" height="16" alt=""> [processing/p5.js](https://github.com/processing/p5.js) | 24.3k | [#9226](https://github.com/processing/p5.js/pull/9226) fix(core): keep pixelDensity when createCanvas replaces the renderer |
 | <img src="https://github.com/foss42.png?size=40" width="16" height="16" alt=""> [foss42/apidash](https://github.com/foss42/apidash) | 2.9k | [#1834](https://github.com/foss42/apidash/pull/1834) feat: add GraphQL variables JSON editor |
 | <img src="https://github.com/jjjake.png?size=40" width="16" height="16" alt=""> [jjjake/internetarchive](https://github.com/jjjake/internetarchive) | 1.9k | [#811](https://github.com/jjjake/internetarchive/pull/811) Honor ignore_existing during Item.download dry_run |
+| <img src="https://github.com/CrossGL.png?size=40" width="16" height="16" alt=""> [CrossGL/crosstl](https://github.com/CrossGL/crosstl) | 1.7k | [#3612](https://github.com/CrossGL/crosstl/pull/3612) Number HIP __constant__ bindings as the CUDA importer does |
 | <img src="https://github.com/zulip.png?size=40" width="16" height="16" alt=""> [zulip/python-zulip-api](https://github.com/zulip/python-zulip-api) | 407 | [#924](https://github.com/zulip/python-zulip-api/pull/924) zulip: Optionally retry requests that hit RATE_LIMIT_HIT. |
 | <img src="https://github.com/mloda-ai.png?size=40" width="16" height="16" alt=""> [mloda-ai/mloda](https://github.com/mloda-ai/mloda) | 98 | [#2427](https://github.com/mloda-ai/mloda/pull/2427) test: share the young-first gc reclaim loop in tests/helpers |
 | <img src="https://github.com/accordproject.png?size=40" width="16" height="16" alt=""> [accordproject/template-playground](https://github.com/accordproject/template-playground) | 77 | [#996](https://github.com/accordproject/template-playground/pull/996) fix(build): emit index.html for known SPA routes so S3 deep links return 200 |
