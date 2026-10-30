@@ -10,12 +10,16 @@
 
 <table>
   <tr>
+    <td width="50%"><a href="https://github.com/devnishantt/bank-management-system"><img src="assets/card-bank.svg" width="100%" alt="bank-management-system: banking API with a double-entry ledger, row-locked transfers, Idempotency-Key retries and rotating refresh tokens."></a></td>
     <td width="50%"><a href="https://github.com/devnishantt/Hospital-Management"><img src="assets/card-hospital.svg" width="100%" alt="Hospital-Management: hospital management API with JWT rotation, Redis token blacklist, rate limiting, uploads and email."></a></td>
-    <td width="50%"><a href="https://github.com/devnishantt/API-Gateway-Flights"><img src="assets/card-flights.svg" width="100%" alt="Flight booking microservices: API gateway, auth, flight and booking services with a cron job that cancels stale bookings."></a></td>
   </tr>
   <tr>
+    <td width="50%"><a href="https://github.com/devnishantt/API-Gateway-Flights"><img src="assets/card-flights.svg" width="100%" alt="Flight booking microservices: API gateway, auth, flight and booking services with a cron job that cancels stale bookings."></a></td>
     <td width="50%"><a href="https://github.com/devnishantt/TwitterClone"><img src="assets/card-twitter.svg" width="100%" alt="TwitterClone: microblogging API with cookie-based JWT auth, Zod validation and rotating logs."></a></td>
+  </tr>
+  <tr>
     <td width="50%"><a href="https://github.com/devnishantt/Tea-Code-Problem-Service"><img src="assets/card-teacode.svg" width="100%" alt="Tea-Code-Problem-Service: coding judge problem service with Markdown problems sanitized before storage."></a></td>
+    <td width="50%"></td>
   </tr>
 </table>
 

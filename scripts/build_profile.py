@@ -43,6 +43,10 @@ STACK = ["typescript", "javascript", "nodedotjs", "express", "prisma", "postgres
          "redis", "zod", "sequelize", "python", "dart", "flutter", "git", "github"]
 
 CARDS = [
+    {"slug": "bank", "name": "bank-management-system", "url": "https://github.com/devnishantt/bank-management-system",
+     "desc": "Banking API with a double-entry ledger, row-locked transfers that cannot deadlock, "
+             "Idempotency-Key retries and rotating refresh tokens.",
+     "stack": ["typescript", "express", "prisma", "postgresql", "zod"]},
     {"slug": "hospital", "name": "Hospital-Management", "url": "https://github.com/devnishantt/Hospital-Management",
      "desc": "Hospital management API: JWT access and refresh tokens with rotation, a Redis-backed token "
              "blacklist, rate limiting, file uploads and email.",
