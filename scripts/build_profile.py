@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
-"""Generate the profile README graphics and pull-request table from live GitHub data.
+"""Generate the profile README graphics from live GitHub data.
 
 Writes, all self-contained (images embedded, no third-party services):
-  assets/hero.svg      animated terminal intro with live PR numbers
-  assets/orbit.svg     every project I contribute to, orbiting at a size set by its stars
-  assets/journey.svg   my pull requests drawn as a git graph, oldest first
-  assets/stack.svg     tools I use, plus the language split of my own repositories
-  assets/card-*.svg    project cards
-and the README block between <!-- oss:start --> and <!-- oss:end -->.
+  assets/hero.svg       animated terminal intro with live repository and CI numbers
+  assets/pipeline.svg   live CI board: the latest main-branch run of every featured project
+  assets/card-*.svg     project cards with a live CI status light
+  assets/stack.svg      tools I use, plus the language split of my own repositories
+  assets/footer.svg     animated sign-off
 
 Standard library only. Usage: GITHUB_TOKEN=... python scripts/build_profile.py [--user LOGIN]
 """
@@ -21,7 +20,6 @@ import json
 import math
 import os
 import random
-import re
 import sys
 import urllib.request
 from datetime import datetime, timezone
@@ -29,97 +27,88 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 ASSETS = ROOT / "assets"
-README = ROOT / "README.md"
 ICONS = json.loads((ROOT / "scripts" / "icons.json").read_text())
-START, END = "<!-- oss:start -->", "<!-- oss:end -->"
 
 MONO = "ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace"
 SANS = "-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans',Helvetica,Arial,sans-serif"
-VIOLET, CYAN, GREEN, GREY = "#a371f7", "#39d0d8", "#3fb950", "#8b949e"
-STATE_COLOR = {"MERGED": VIOLET, "OPEN": GREEN, "CLOSED": GREY}
-STATE_LABEL = {"MERGED": "merged", "OPEN": "in review", "CLOSED": "closed"}
+VIOLET, CYAN, GREEN, GREY, RED, AMBER = "#a371f7", "#39d0d8", "#3fb950", "#8b949e", "#f85149", "#d29922"
 
-STACK = ["typescript", "javascript", "nodedotjs", "express", "prisma", "postgresql", "mysql", "mongodb",
-         "redis", "zod", "sequelize", "python", "dart", "flutter", "git", "github"]
+STACK = ["typescript", "javascript", "nodedotjs", "python", "express", "fastify", "hono", "bun",
+         "react", "zod", "prisma", "postgresql", "redis", "cloudflare", "duckdb", "pydantic",
+         "vitest", "pytest", "docker", "githubactions", "mysql", "mongodb", "git", "github"]
 
-CARDS = [
-    {"slug": "bank", "name": "bank-management-system", "url": "https://github.com/devnishantt/bank-management-system",
-     "desc": "Banking API with a double-entry ledger, row-locked transfers that cannot deadlock, "
-             "Idempotency-Key retries and rotating refresh tokens.",
-     "stack": ["typescript", "express", "prisma", "postgresql", "zod"]},
-    {"slug": "hospital", "name": "Hospital-Management", "url": "https://github.com/devnishantt/Hospital-Management",
-     "desc": "Hospital management API: JWT access and refresh tokens with rotation, a Redis-backed token "
-             "blacklist, rate limiting, file uploads and email.",
-     "stack": ["typescript", "express", "prisma", "postgresql", "redis"]},
-    {"slug": "flights", "name": "Flight booking microservices", "url": "https://github.com/devnishantt/API-Gateway-Flights",
-     "desc": "API gateway, auth, flight and booking services. Bookings check seats with the flight service, "
-             "and a cron job cancels stale bookings.",
-     "stack": ["nodedotjs", "express", "sequelize", "mysql"]},
-    {"slug": "twitter", "name": "TwitterClone", "url": "https://github.com/devnishantt/TwitterClone",
-     "desc": "Microblogging API with cookie-based JWT auth, Zod validation and rotating log files.",
-     "stack": ["typescript", "express", "prisma", "postgresql", "zod"]},
-    {"slug": "teacode", "name": "Tea-Code-Problem-Service", "url": "https://github.com/devnishantt/Tea-Code-Problem-Service",
-     "desc": "Problem service for a coding judge. Problems are written in Markdown and sanitized before "
-             "they are stored.",
-     "stack": ["nodedotjs", "express", "mongodb"]},
+# Featured projects, newest work first. `steps` mirrors each repository's CI workflow.
+PROJECTS = [
+    {"slug": "ledgerline", "repo": "ledgerline", "name": "Ledgerline", "lang": "typescript",
+     "tag": "Financial reconciliation workspace",
+     "desc": "Matches bank statements against ledger records with exact minor-unit money, a separate "
+             "reviewer credential for approvals and a hash-linked audit trail.",
+     "stack": ["react", "hono", "cloudflare", "zod"],
+     "steps": ["install", "typecheck", "test", "build", "audit"]},
+    {"slug": "aftermark", "repo": "aftermark", "name": "Aftermark", "lang": "typescript",
+     "tag": "Evidence-driven incident response API",
+     "desc": "Incidents close only when two independent people approve the exact evidence manifest. "
+             "Hash-linked history and revision-claimed writes.",
+     "stack": ["fastify", "bun", "zod", "cloudflare"],
+     "steps": ["install", "typecheck", "test", "build", "docker"]},
+    {"slug": "pactrail", "repo": "Pactrail", "name": "Pactrail", "lang": "typescript",
+     "tag": "API contract checks and OpenAPI diffing",
+     "desc": "Library and CLI that validates payloads against OpenAPI schemas, flags breaking changes "
+             "between versions and runs deterministic response fixtures.",
+     "stack": ["typescript", "nodedotjs", "zod", "vitest"],
+     "steps": ["install", "typecheck", "test", "smoke", "pack"]},
+    {"slug": "tracebench", "repo": "tracebench", "name": "Tracebench", "lang": "python",
+     "tag": "Local-first dataset contracts and drift",
+     "desc": "Checks CSV, JSONL and Parquet files against explicit contracts, profiles them and writes "
+             "reproducible drift reports in JSON, Markdown and HTML.",
+     "stack": ["python", "duckdb", "pydantic", "pytest"],
+     "steps": ["install", "lint", "mypy", "test", "build"]},
+    {"slug": "bank", "repo": "bank-management-system", "name": "bank-management-system", "lang": "typescript",
+     "tag": "Banking REST API",
+     "desc": "Double-entry ledger, row-locked transfers that cannot deadlock, Idempotency-Key retries "
+             "and rotating refresh tokens.",
+     "stack": ["express", "prisma", "postgresql", "docker"],
+     "steps": ["install", "typecheck", "test", "build"]},
+    {"slug": "hospital", "repo": "Hospital-Management", "name": "Hospital-Management", "lang": "typescript",
+     "tag": "Hospital management API",
+     "desc": "JWT access and refresh tokens with rotation, a Redis-backed token blacklist, rate "
+             "limiting, file uploads and email.",
+     "stack": ["express", "prisma", "postgresql", "redis"],
+     "steps": []},
 ]
-
-PR_QUERY = """
-query($q: String!, $cursor: String) {
-  search(query: $q, type: ISSUE, first: 100, after: $cursor) {
-    pageInfo { hasNextPage endCursor }
-    nodes { ... on PullRequest {
-      number title url state createdAt
-      repository { nameWithOwner url stargazerCount owner { login } primaryLanguage { name } }
-    } }
-  }
-}"""
 
 PROFILE_QUERY = """
 query($login: String!) { user(login: $login) {
   createdAt
   contributionsCollection { contributionCalendar { totalContributions } }
   repositories(ownerAffiliations: OWNER, isFork: false, first: 100, orderBy: {field: PUSHED_AT, direction: DESC}) {
-    nodes { name languages(first: 10) { edges { size node { name color } } } }
+    nodes { name isPrivate languages(first: 10) { edges { size node { name color } } } }
   }
 } }"""
 
 
 # ---------------------------------------------------------------- data
 
-def gql(token: str, query: str, variables: dict) -> dict:
-    req = urllib.request.Request(
-        "https://api.github.com/graphql",
-        data=json.dumps({"query": query, "variables": variables}).encode(),
-        headers={"Authorization": f"bearer {token}", "User-Agent": "profile-builder"},
-    )
+def request(url: str, token: str, data: bytes | None = None) -> dict:
+    req = urllib.request.Request(url, data=data, headers={
+        "Authorization": f"bearer {token}", "User-Agent": "profile-builder",
+        "Accept": "application/vnd.github+json"})
     with urllib.request.urlopen(req, timeout=40) as resp:
-        payload = json.load(resp)
+        return json.load(resp)
+
+
+def gql(token: str, query: str, variables: dict) -> dict:
+    payload = request("https://api.github.com/graphql", token,
+                      json.dumps({"query": query, "variables": variables}).encode())
     if payload.get("errors"):
         raise SystemExit(f"GraphQL error: {payload['errors']}")
     return payload["data"]
 
 
-def fetch_prs(token: str, user: str) -> list[dict]:
-    prs, cursor = [], None
-    while True:
-        data = gql(token, PR_QUERY, {"q": f"author:{user} is:pr", "cursor": cursor})["search"]
-        for n in data["nodes"]:
-            if not n or n["repository"]["owner"]["login"].lower() == user.lower():
-                continue
-            r = n["repository"]
-            prs.append({"repo": r["nameWithOwner"], "repo_url": r["url"], "owner": r["owner"]["login"],
-                        "stars": r["stargazerCount"], "number": n["number"], "title": n["title"],
-                        "url": n["url"], "state": n["state"], "created": n["createdAt"]})
-        if not data["pageInfo"]["hasNextPage"]:
-            return sorted(prs, key=lambda p: p["created"])
-        cursor = data["pageInfo"]["endCursor"]
-
-
 def fetch_profile(token: str, user: str) -> dict:
     u = gql(token, PROFILE_QUERY, {"login": user})["user"]
-    # The profile repository itself is not a project.
-    repos = [r for r in u["repositories"]["nodes"] if r["name"].lower() != user.lower()]
+    # The profile repository itself is not a project; private repositories are not advertised.
+    repos = [r for r in u["repositories"]["nodes"] if r["name"].lower() != user.lower() and not r["isPrivate"]]
     langs: dict[str, list] = {}
     for repo in repos:
         for e in repo["languages"]["edges"]:
@@ -130,6 +119,25 @@ def fetch_profile(token: str, user: str) -> dict:
     return {"since": u["createdAt"][:4], "repos": [r["name"] for r in repos],
             "contributions": u["contributionsCollection"]["contributionCalendar"]["totalContributions"],
             "languages": [(name, size / total, color) for name, (size, color) in top if size / total >= 0.005]}
+
+
+def fetch_ci(token: str, user: str, repo: str) -> dict | None:
+    """Latest completed main-branch workflow run, or None when the repository has no CI."""
+    url = (f"https://api.github.com/repos/{user}/{repo}/actions/runs"
+           f"?branch=main&status=completed&per_page=1&exclude_pull_requests=true")
+    try:
+        runs = request(url, token).get("workflow_runs") or []
+    except Exception as exc:
+        print(f"warning: CI lookup for {repo}: {exc}", file=sys.stderr)
+        return None
+    if not runs:
+        return None
+    r = runs[0]
+    start = datetime.fromisoformat((r.get("run_started_at") or r["created_at"]).replace("Z", "+00:00"))
+    end = datetime.fromisoformat(r["updated_at"].replace("Z", "+00:00"))
+    return {"conclusion": r["conclusion"] or "unknown", "name": r["name"], "sha": r["head_sha"][:7],
+            "seconds": max(0, int((end - start).total_seconds())), "date": end.strftime("%b %d"),
+            "url": r["html_url"]}
 
 
 def fetch_image(url: str) -> str | None:
@@ -148,16 +156,11 @@ def data_uri(raw: bytes) -> str:
     return f"data:{mime};base64,{base64.b64encode(raw).decode()}"
 
 
-def summarize(prs: list[dict]) -> dict:
-    live = [p for p in prs if p["state"] != "CLOSED"]
-    projects: dict[str, dict] = {}
-    for p in live:
-        pr = projects.setdefault(p["repo"], {"repo": p["repo"], "owner": p["owner"], "stars": p["stars"],
-                                              "url": p["repo_url"], "merged": 0, "open": 0})
-        pr["merged" if p["state"] == "MERGED" else "open"] += 1
-    ordered = sorted(projects.values(), key=lambda r: (-(r["merged"] > 0), -r["stars"]))
-    return {"merged": sum(p["state"] == "MERGED" for p in prs), "open": sum(p["state"] == "OPEN" for p in prs),
-            "projects": ordered, "reach": sum(r["stars"] for r in ordered)}
+def ci_look(ci: dict | None) -> tuple[str, str]:
+    if ci is None:
+        return GREY, "no CI"
+    return {"success": (GREEN, "passing"), "failure": (RED, "failing"),
+            "cancelled": (GREY, "cancelled")}.get(ci["conclusion"], (AMBER, ci["conclusion"]))
 
 
 # ---------------------------------------------------------------- helpers
@@ -230,29 +233,33 @@ def starfield(w: int, h: int, count: int, seed: int) -> str:
 
 # ---------------------------------------------------------------- hero
 
-def build_hero(st: dict, prof: dict, user: str, avatar: str | None) -> str:
-    W, H, fs, lh, x0, y0 = 960, 300, 14, 26, 314, 98
+def build_hero(prof: dict, ci: dict, user: str, avatar: str | None) -> str:
+    W, H, fs, lh, x0, y0 = 960, 320, 14, 26, 314, 100
     cw = fs * 0.62
+    featured = [p["repo"] for p in PROJECTS]
     listing = ""
-    for name in prof["repos"]:
+    for name in featured:
         candidate = f"{listing}  {name}".strip()
         if len(candidate) > 62:
             listing += "  …"
             break
         listing = candidate
+    with_ci = [p for p in PROJECTS if ci.get(p["slug"])]
+    green = sum(ci[p["slug"]]["conclusion"] == "success" for p in with_ci)
     lines = [
         ("cmd", "whoami"),
-        ("out", [("Nishant", "name"), (" · backend developer · TypeScript & Node.js", "txt")]),
-        ("cmd", "ls ~/projects"),
+        ("out", [("Nishant", "name"), (" · backend engineer · TypeScript, Node.js & Python", "txt")]),
+        ("cmd", "ls ~/projects --featured"),
         ("out", [(listing, "cy")]),
-        ("cmd", "cat stats.txt"),
-        ("out", [("● ", "mg"), (f"{len(prof['repos'])} repositories   ", "txt"), ("● ", "op"),
-                 (f"{prof['contributions']} contributions in the past year", "txt")]),
+        ("cmd", "gh run list --branch main"),
+        ("out", [("● ", "op" if green == len(with_ci) else "yl"),
+                 (f"{green}/{len(with_ci)} pipelines green   ", "txt"), ("● ", "mg"),
+                 (f"{len(prof['repos'])} public repositories", "txt")]),
     ]
     t, timing = 0.6, []
     for kind, content in lines:
         if kind == "cmd":
-            end = t + len(content) * 0.055
+            end = t + len(content) * 0.05
             timing.append((t, end))
             t = end + 0.35
         else:
@@ -269,7 +276,7 @@ def build_hero(st: dict, prof: dict, user: str, avatar: str | None) -> str:
             defs.append(f'<clipPath id="c{i}"><rect x="{x0}" y="{y - 17}" width="{w:.1f}" height="24">'
                         f'<animate attributeName="width" values="0;0;{w:.1f};{w:.1f}" keyTimes="{k}" dur="{T:.2f}s" '
                         f'fill="freeze"/></rect></clipPath>')
-            body.append(f'<text class="m" x="{x0}" y="{y}" clip-path="url(#c{i})"><tspan class="pr">$ </tspan>'
+            body.append(f'<text xml:space="preserve" class="m" x="{x0}" y="{y}" clip-path="url(#c{i})"><tspan class="pr">$ </tspan>'
                         f'<tspan class="cmd">{esc(content)}</tspan></text>')
             cx0, cx1 = x0 + 2 * cw, x0 + w - 4
             body.append(f'<rect class="cur" x="{cx0:.1f}" y="{y - 13}" width="8" height="16" opacity="0">'
@@ -280,11 +287,11 @@ def build_hero(st: dict, prof: dict, user: str, avatar: str | None) -> str:
                         f'</rect>')
         else:
             spans = "".join(f'<tspan class="{c}">{esc(s)}</tspan>' for s, c in content)
-            body.append(f'<text class="m" x="{x0}" y="{y}">{spans}'
+            body.append(f'<text xml:space="preserve" class="m" x="{x0}" y="{y}">{spans}'
                         f'<animate attributeName="opacity" values="0;0;1;1" keyTimes="{kt(0, a / T, a / T + 0.01, 1)}" '
                         f'dur="{T:.2f}s" fill="freeze"/></text>')
     yf = y0 + len(lines) * lh
-    body.append(f'<text class="m" x="{x0}" y="{yf}"><tspan class="pr">$ </tspan>'
+    body.append(f'<text xml:space="preserve" class="m" x="{x0}" y="{yf}"><tspan class="pr">$ </tspan>'
                 f'<animate attributeName="opacity" values="0;0;1" keyTimes="{kt(0, final / T, final / T)}" '
                 f'dur="{T:.2f}s" fill="freeze"/></text>')
     body.append(f'<rect class="cur" x="{x0 + 2 * cw:.1f}" y="{yf - 13}" width="8" height="16">'
@@ -293,27 +300,31 @@ def build_hero(st: dict, prof: dict, user: str, avatar: str | None) -> str:
                 f'<animate attributeName="opacity" values="1;1;0;0" keyTimes="0;0.5;0.5;1" dur="1.1s" '
                 f'begin="{final:.2f}s" repeatCount="indefinite"/></rect>')
 
-    acx, acy, ar = 160, 142, 88
+    acx, acy, ar = 160, 146, 88
     face = (f'<image href="{avatar}" x="{acx - ar}" y="{acy - ar}" width="{2 * ar}" height="{2 * ar}" '
             f'clip-path="url(#av)" preserveAspectRatio="xMidYMid slice"/>' if avatar else
             f'<text x="{acx}" y="{acy + 22}" text-anchor="middle" class="mono-big">N</text>')
-    return f"""{svg_open(W, H, f"Terminal intro for {user}: backend developer, {len(prof['repos'])} repositories")}
+    return f"""{svg_open(W, H, f"Terminal intro for {user}: backend engineer. {green} of {len(with_ci)} featured CI pipelines are green.")}
 <style>
   .m{{font:{fs}px {MONO};white-space:pre}} .pr{{fill:{VIOLET};font-weight:700}} .cmd{{fill:#e6edf3}}
   .txt{{fill:#c9d1d9}} .name{{fill:{CYAN};font-weight:700}} .mg{{fill:{VIOLET}}} .op{{fill:{GREEN}}}
-  .cy{{fill:{CYAN}}} .yl{{fill:#e3b341}} .cur{{fill:{CYAN}}} .dim{{fill:#6e7681;font:12px {MONO}}}
+  .cy{{fill:{CYAN}}} .yl{{fill:{AMBER}}} .cur{{fill:{CYAN}}} .dim{{fill:#6e7681;font:12px {MONO}}}
   .handle{{fill:#c9d1d9;font:600 14px {MONO}}} .mono-big{{fill:#e6edf3;font:700 64px {SANS}}}
+  .scan{{animation:scan 7s linear infinite}} @keyframes scan{{from{{transform:translateY(-40px)}}to{{transform:translateY({H}px)}}}}
 </style>
 <defs>
   <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0b1020"/><stop offset="1" stop-color="#150b2e"/></linearGradient>
   <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="{VIOLET}"/><stop offset="1" stop-color="{CYAN}"/></linearGradient>
+  <linearGradient id="scanline" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="{CYAN}" stop-opacity="0"/><stop offset="1" stop-color="{CYAN}" stop-opacity=".07"/></linearGradient>
   <radialGradient id="glow"><stop offset="0" stop-color="{VIOLET}" stop-opacity=".55"/><stop offset="1" stop-color="{VIOLET}" stop-opacity="0"/></radialGradient>
   <pattern id="dots" width="22" height="22" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="1" fill="#ffffff" opacity=".06"/></pattern>
   <clipPath id="av"><circle cx="{acx}" cy="{acy}" r="{ar}"/></clipPath>
+  <clipPath id="term"><rect x="290" y="30" width="644" height="260" rx="14"/></clipPath>
   {''.join(defs)}
 </defs>
 <rect width="{W}" height="{H}" rx="20" fill="url(#bg)"/>
 <rect width="{W}" height="{H}" rx="20" fill="url(#dots)"/>
+{starfield(W, H, 40, 3)}
 <circle cx="{acx}" cy="{acy}" r="128" fill="url(#glow)"><animate attributeName="r" values="118;134;118" dur="5s" repeatCount="indefinite"/></circle>
 {face}
 <circle cx="{acx}" cy="{acy}" r="{ar + 9}" fill="none" stroke="url(#ring)" stroke-width="3" stroke-linecap="round" stroke-dasharray="70 26 14 26">
@@ -323,8 +334,9 @@ def build_hero(st: dict, prof: dict, user: str, avatar: str | None) -> str:
 <circle cx="{acx + 62}" cy="{acy + 64}" r="9" fill="{GREEN}" stroke="#0b1020" stroke-width="4"/>
 <circle cx="{acx + 62}" cy="{acy + 64}" r="9" fill="none" stroke="{GREEN}" stroke-width="2">
   <animate attributeName="r" values="9;20" dur="2s" repeatCount="indefinite"/><animate attributeName="opacity" values=".8;0" dur="2s" repeatCount="indefinite"/></circle>
-<text x="{acx}" y="270" text-anchor="middle" class="handle">@{esc(user)}</text>
-<rect x="290" y="30" width="644" height="240" rx="14" fill="#0d1117" fill-opacity=".88" stroke="#30363d"/>
+<text x="{acx}" y="278" text-anchor="middle" class="handle">@{esc(user)}</text>
+<rect x="290" y="30" width="644" height="260" rx="14" fill="#0d1117" fill-opacity=".9" stroke="#30363d"/>
+<g clip-path="url(#term)"><rect class="scan" x="290" y="0" width="644" height="40" fill="url(#scanline)"/></g>
 <circle cx="312" cy="52" r="6" fill="#ff5f57"/><circle cx="332" cy="52" r="6" fill="#febc2e"/><circle cx="352" cy="52" r="6" fill="#28c840"/>
 <text x="612" y="56" text-anchor="middle" class="dim">{esc(user)}@github: ~</text>
 <line x1="290" y1="70" x2="934" y2="70" stroke="#21262d"/>
@@ -333,118 +345,68 @@ def build_hero(st: dict, prof: dict, user: str, avatar: str | None) -> str:
 """
 
 
-# ---------------------------------------------------------------- orbit
+# ---------------------------------------------------------------- pipeline
 
-def build_orbit(st: dict, sun: str | None, avatars: dict[str, str | None]) -> str:
-    W, H, cx, cy = 960, 450, 300, 228
-    projects = st["projects"][:11]
-    n = len(projects)
-    planets, rings, legend = [], [], []
-    for i, p in enumerate(projects):
-        rx = 84 + i * (262 - 84) / max(n - 1, 1)
-        ry = rx * 0.40
-        period = 16 * (rx / 84) ** 1.5
-        phase = ((i * 0.618) % 1) * period
-        r = 8 + 3.0 * math.log10(p["stars"] + 1)
-        col = VIOLET if p["merged"] else GREEN
-        path = f"M{cx - rx:.1f},{cy} a{rx:.1f},{ry:.1f} 0 1,1 {2 * rx:.1f},0 a{rx:.1f},{ry:.1f} 0 1,1 {-2 * rx:.1f},0"
-        rings.append(f'<ellipse cx="{cx}" cy="{cy}" rx="{rx:.1f}" ry="{ry:.1f}" fill="none" stroke="{col}" '
-                     f'stroke-opacity=".22" stroke-width="1" stroke-dasharray="3 6"/>')
-        uri = avatars.get(p["owner"])
-        face = (f'<image href="{uri}" x="{-r:.1f}" y="{-r:.1f}" width="{2 * r:.1f}" height="{2 * r:.1f}" clip-path="url(#pc)"/>'
-                if uri else f'<text y="{r * 0.35:.1f}" text-anchor="middle" class="mono">{esc(p["owner"][:1].upper())}</text>')
-        halo = (f'<circle r="{r + 3}" fill="none" stroke="{col}" stroke-width="1.5"><animate attributeName="r" '
-                f'values="{r + 3:.1f};{r + 12:.1f}" dur="2.4s" repeatCount="indefinite"/><animate attributeName="opacity" '
-                f'values=".7;0" dur="2.4s" repeatCount="indefinite"/></circle>' if p["merged"] else "")
-        planets.append(f'<g>{halo}<circle r="{r + 2.5:.1f}" fill="#0d1117" stroke="{col}" stroke-width="2"/>{face}'
-                       f'<animateMotion dur="{period:.1f}s" begin="-{phase:.1f}s" repeatCount="indefinite" path="{path}"/></g>')
-        ly = 108 + i * 29
-        d = 0.25 + i * 0.12
-        luri = avatars.get(p["owner"])
-        mini = (f'<image href="{luri}" x="618" y="{ly - 13}" width="18" height="18" clip-path="url(#pc)"/>' if luri
-                else f'<circle cx="627" cy="{ly - 4}" r="9" fill="#21262d"/>')
-        legend.append(f'<g class="row" style="animation-delay:{d:.2f}s"><circle cx="606" cy="{ly - 4}" r="4" fill="{col}"/>{mini}'
-                      f'<text x="646" y="{ly}" class="lg">{esc(trunc(p["repo"], 29))}</text>'
-                      f'<text x="928" y="{ly}" class="st" text-anchor="end">★ {human(p["stars"])}</text></g>')
-    more = len(st["projects"]) - n
-    if more > 0:
-        legend.append(f'<text x="606" y="{108 + n * 29}" class="st">+{more} more</text>')
-    sun_face = (f'<image href="{sun}" x="{cx - 34}" y="{cy - 34}" width="68" height="68" clip-path="url(#pc)"/>' if sun else "")
-    return f"""{svg_open(W, H, "Projects I contribute to, orbiting by star count")}
-<style>
-  .t{{fill:#e6edf3;font:700 18px {SANS}}} .s{{fill:#8b949e;font:13px {SANS}}} .lg{{fill:#c9d1d9;font:13px {MONO}}}
-  .st{{fill:#8b949e;font:12px {MONO}}} .mono{{fill:#e6edf3;font:700 12px {SANS}}}
-  .row{{animation:in .6s ease-out both}} @keyframes in{{from{{opacity:0;transform:translateX(12px)}}to{{opacity:1;transform:none}}}}
-</style>
-<defs>
-  <radialGradient id="sky" cx=".3" cy=".5" r=".9"><stop offset="0" stop-color="#1a1240"/><stop offset=".55" stop-color="#0b1020"/><stop offset="1" stop-color="#05070f"/></radialGradient>
-  <radialGradient id="sunglow"><stop offset="0" stop-color="{CYAN}" stop-opacity=".55"/><stop offset=".45" stop-color="{VIOLET}" stop-opacity=".25"/><stop offset="1" stop-color="{VIOLET}" stop-opacity="0"/></radialGradient>
-  <clipPath id="pc" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath>
-</defs>
-<rect width="{W}" height="{H}" rx="20" fill="url(#sky)"/>
-{starfield(W, H, 110, 7)}
-<g transform="rotate(-8 {cx} {cy})">{''.join(rings)}</g>
-<circle cx="{cx}" cy="{cy}" r="78" fill="url(#sunglow)"><animate attributeName="r" values="70;88;70" dur="6s" repeatCount="indefinite"/></circle>
-<circle cx="{cx}" cy="{cy}" r="37" fill="#0d1117" stroke="url(#sunglow)" stroke-width="2"/>
-{sun_face}
-<g transform="rotate(-8 {cx} {cy})">{''.join(planets)}</g>
-<line x1="580" y1="34" x2="580" y2="{H - 34}" stroke="#30363d"/>
-<text x="606" y="58" class="t">Projects I contribute to</text>
-<text x="606" y="80" class="s"><tspan fill="{VIOLET}">●</tspan> merged    <tspan fill="{GREEN}">●</tspan> in review    · planet size = stars</text>
-{''.join(legend)}
-</svg>
-"""
-
-
-# ---------------------------------------------------------------- journey
-
-def build_journey(prs: list[dict]) -> str:
-    W, row, top = 960, 46, 84
-    H = top + max(len(prs), 1) * row + 26
-    mx = 54
-    rows = []
-    for i, p in enumerate(prs):
-        y = top + i * row + 10
-        col = STATE_COLOR[p["state"]]
-        d = 0.35 + i * 0.12
-        out = f'<path d="M{mx},{y - 22} C{mx},{y - 6} {mx + 12},{y} {mx + 40},{y} L{mx + 62},{y}" class="br" stroke="{col}"/>'
-        back = (f'<path d="M{mx + 62},{y} C{mx + 86},{y} {mx + 86},{y + 26} {mx},{y + 30}" class="br" stroke="{col}" '
-                f'stroke-dasharray="0"/>' if p["state"] == "MERGED" else "")
-        if p["state"] == "OPEN":
-            dot = (f'<circle cx="{mx + 62}" cy="{y}" r="6" fill="{col}"/><circle cx="{mx + 62}" cy="{y}" r="6" fill="none" '
-                   f'stroke="{col}"><animate attributeName="r" values="6;14" dur="2s" repeatCount="indefinite"/>'
-                   f'<animate attributeName="opacity" values=".8;0" dur="2s" repeatCount="indefinite"/></circle>')
-        elif p["state"] == "MERGED":
-            dot = f'<circle cx="{mx + 62}" cy="{y}" r="6.5" fill="#0d1117" stroke="{col}" stroke-width="3"/>'
-        else:
-            dot = f'<circle cx="{mx + 62}" cy="{y}" r="6" fill="#0d1117" stroke="{col}" stroke-width="2"/>'
-        date = datetime.fromisoformat(p["created"].replace("Z", "+00:00")).strftime("%b %d")
-        label = STATE_LABEL[p["state"]]
-        pw = 14 + len(label) * 7
-        rows.append(
-            f'<g class="row" style="animation-delay:{d:.2f}s">{out}{back}{dot}'
-            f'<text x="{mx + 84}" y="{y - 3}" class="repo"><tspan fill="{col}">{esc(p["repo"])}</tspan>'
-            f'<tspan class="num"> #{p["number"]}</tspan></text>'
-            f'<text x="{mx + 84}" y="{y + 15}" class="ttl">{esc(trunc(p["title"], 92))}</text>'
-            f'<text x="{W - 40 - pw - 10}" y="{y + 4}" class="date" text-anchor="end">{date}</text>'
-            f'<rect x="{W - 40 - pw}" y="{y - 10}" width="{pw}" height="20" rx="10" fill="{col}" fill-opacity=".15" stroke="{col}" stroke-opacity=".6"/>'
-            f'<text x="{W - 40 - pw / 2}" y="{y + 4}" class="pill" text-anchor="middle" fill="{col}">{label}</text></g>')
-    main_len = H - 70
-    return f"""{svg_open(W, H, "My open-source pull requests drawn as a git graph")}
+def build_pipeline(ci: dict) -> str:
+    rows = [p for p in PROJECTS if p["steps"] and ci.get(p["slug"])]
+    W, top, rh = 960, 92, 64
+    H = top + len(rows) * rh + 34
+    x_name, x_steps0, x_steps1 = 40, 300, 650
+    cycle = 6.0
+    body = []
+    for i, p in enumerate(rows):
+        run = ci[p["slug"]]
+        col, label = ci_look(run)
+        y = top + i * rh + 20
+        steps = p["steps"]
+        n = len(steps)
+        xs = [x_steps0 + j * (x_steps1 - x_steps0) / max(n - 1, 1) for j in range(n)]
+        offset = i * 0.45
+        lang = ICONS[p["lang"]]
+        body.append(f'<g class="row" style="animation-delay:{0.15 + i * 0.12:.2f}s">')
+        body.append(f'<rect x="20" y="{y - 26}" width="{W - 40}" height="{rh - 10}" rx="12" class="lane"/>')
+        body.append(f'<circle cx="{x_name + 6}" cy="{y - 4}" r="5" fill="#{lang["hex"]}"/>')
+        body.append(f'<text x="{x_name + 20}" y="{y}" class="nm">{esc(p["name"])}</text>')
+        body.append(f'<text x="{x_name + 20}" y="{y + 17}" class="meta">{esc(run["name"])} · {run["sha"]}</text>')
+        body.append(f'<line x1="{xs[0]}" y1="{y}" x2="{xs[-1]}" y2="{y}" class="rail"/>')
+        # A light travels along the pipeline, then every node flashes in turn.
+        body.append(f'<line x1="{xs[0]}" y1="{y}" x2="{xs[-1]}" y2="{y}" stroke="{col}" stroke-width="2.5" '
+                    f'stroke-linecap="round" stroke-dasharray="{xs[-1] - xs[0]:.1f}" stroke-dashoffset="{xs[-1] - xs[0]:.1f}">'
+                    f'<animate attributeName="stroke-dashoffset" values="{xs[-1] - xs[0]:.1f};0;0;{xs[-1] - xs[0]:.1f}" '
+                    f'keyTimes="0;.55;.9;1" dur="{cycle}s" begin="{offset:.2f}s" repeatCount="indefinite"/></line>')
+        body.append(f'<circle r="4" fill="#ffffff" opacity="0"><animateMotion dur="{cycle}s" begin="{offset:.2f}s" '
+                    f'repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.55;1" calcMode="linear" '
+                    f'path="M{xs[0]},{y} L{xs[-1]},{y}"/><animate attributeName="opacity" values="0;1;1;0;0" '
+                    f'keyTimes="0;.05;.5;.56;1" dur="{cycle}s" begin="{offset:.2f}s" repeatCount="indefinite"/></circle>')
+        for j, (x, step) in enumerate(zip(xs, steps)):
+            hit = 0.55 * j / max(n - 1, 1)
+            body.append(f'<circle cx="{x:.1f}" cy="{y}" r="8" class="node"/>'
+                        f'<circle cx="{x:.1f}" cy="{y}" r="5" fill="{col}" opacity=".35">'
+                        f'<animate attributeName="opacity" values=".35;.35;1;1;.35" keyTimes="{kt(0, hit, hit + 0.01, 0.9, 1)}" '
+                        f'dur="{cycle}s" begin="{offset:.2f}s" repeatCount="indefinite"/></circle>'
+                        f'<text x="{x:.1f}" y="{y + 24}" class="st" text-anchor="middle">{esc(step)}</text>')
+        dur = f"{run['seconds'] // 60}m {run['seconds'] % 60:02d}s" if run["seconds"] >= 60 else f"{run['seconds']}s"
+        pw = 90
+        px = W - 40 - pw
+        body.append(f'<rect x="{px}" y="{y - 14}" width="{pw}" height="24" rx="12" fill="{col}" fill-opacity=".14" stroke="{col}" stroke-opacity=".7"/>'
+                    f'<circle cx="{px + 15}" cy="{y - 2}" r="4" fill="{col}"><animate attributeName="opacity" values="1;.3;1" dur="2s" repeatCount="indefinite"/></circle>'
+                    f'<text x="{px + 26}" y="{y + 2.5}" class="pill" fill="{col}">{label}</text>'
+                    f'<text x="{px - 14}" y="{y + 2.5}" class="meta" text-anchor="end">{dur} · {run["date"]}</text>')
+        body.append('</g>')
+    return f"""{svg_open(W, H, "Live CI board: the latest main-branch GitHub Actions run of each featured project")}
 <style>
   .h{{fill:#e6edf3;font:600 14px {MONO}}} .c{{fill:#6e7681;font:14px {MONO}}}
-  .repo{{font:600 14px {SANS}}} .num{{fill:#8b949e;font-weight:400}} .ttl{{fill:#8b949e;font:12.5px {SANS}}}
-  .date{{fill:#6e7681;font:12px {MONO}}} .pill{{font:600 11px {SANS}}}
-  .br{{fill:none;stroke-width:2.2;stroke-linecap:round}}
-  .row{{animation:in .5s ease-out both}} @keyframes in{{from{{opacity:0;transform:translateX(-10px)}}to{{opacity:1;transform:none}}}}
-  .trunk{{stroke-dasharray:{main_len};stroke-dashoffset:{main_len};animation:draw 1.4s ease-out forwards}}
-  @keyframes draw{{to{{stroke-dashoffset:0}}}}
+  .nm{{fill:#e6edf3;font:600 14px {SANS}}} .meta{{fill:#6e7681;font:11.5px {MONO}}}
+  .st{{fill:#8b949e;font:11px {MONO}}} .pill{{font:600 11.5px {SANS}}}
+  .lane{{fill:#161b22;fill-opacity:.55;stroke:#21262d}} .rail{{stroke:#30363d;stroke-width:2.5;stroke-linecap:round}}
+  .node{{fill:#0d1117;stroke:#30363d;stroke-width:2}}
+  .row{{animation:in .5s ease-out both}} @keyframes in{{from{{opacity:0;transform:translateY(8px)}}to{{opacity:1;transform:none}}}}
 </style>
 <rect width="{W}" height="{H}" rx="20" fill="#0d1117"/>
 <rect x=".5" y=".5" width="{W - 1}" height="{H - 1}" rx="20" fill="none" stroke="#30363d"/>
-<text x="34" y="44" class="h"><tspan fill="{VIOLET}">$</tspan> git log --graph --author=devnishantt <tspan class="c"># every PR, oldest first</tspan></text>
-<line class="trunk" x1="{mx}" y1="62" x2="{mx}" y2="{H - 14}" stroke="#6e7681" stroke-width="2.2" stroke-linecap="round"/>
-{''.join(rows)}
+<text x="34" y="46" class="h"><tspan fill="{VIOLET}">❯</tspan> gh run list --branch main --limit 1 <tspan class="c"># every featured repo, refreshed daily</tspan></text>
+<line x1="20" y1="64" x2="{W - 20}" y2="64" stroke="#21262d"/>
+{''.join(body)}
 </svg>
 """
 
@@ -495,53 +457,77 @@ def build_stack(prof: dict) -> str:
 """
 
 
+
 # ---------------------------------------------------------------- cards
 
-def build_card(card: dict) -> str:
-    W, H = 460, 168
-    lines = wrap(card["desc"], 60)[:3]
-    desc = "".join(f'<text class="d" x="24" y="{76 + i * 19}">{esc(l)}</text>' for i, l in enumerate(lines))
+def build_card(p: dict, run: dict | None) -> str:
+    W, H = 460, 196
+    col, label = ci_look(run)
+    lines = wrap(p["desc"], 62)[:3]
+    desc = "".join(f'<text class="d" x="24" y="{96 + i * 19}">{esc(l)}</text>' for i, l in enumerate(lines))
     chips, x = [], 24
-    for slug in card["stack"]:
-        label = ICONS[slug]["title"]
-        w = 30 + len(label) * 6.6
-        chips.append(f'<rect class="chip" x="{x:.1f}" y="128" width="{w:.1f}" height="24" rx="12"/>'
-                     f'{icon(slug, x + 8, 134, 12)}<text class="cl" x="{x + 25:.1f}" y="144">{esc(label)}</text>')
+    for slug in p["stack"]:
+        title = ICONS[slug]["title"]
+        w = 30 + len(title) * 6.6
+        chips.append(f'<rect class="chip" x="{x:.1f}" y="156" width="{w:.1f}" height="24" rx="12"/>'
+                     f'{icon(slug, x + 8, 162, 12)}<text class="cl" x="{x + 25:.1f}" y="172">{esc(title)}</text>')
         x += w + 6
-    return f"""{svg_open(W, H, f"{card['name']}: {card['desc']}")}
+    lw = 22 + len(f"CI {label}") * 6.4
+    pulse = (f'<circle cx="{W - 24 - lw + 11}" cy="38" r="4" fill="none" stroke="{col}">'
+             f'<animate attributeName="r" values="4;10" dur="2s" repeatCount="indefinite"/>'
+             f'<animate attributeName="opacity" values=".9;0" dur="2s" repeatCount="indefinite"/></circle>'
+             if run and run["conclusion"] == "success" else "")
+    badge = (f'<rect x="{W - 24 - lw:.1f}" y="26" width="{lw:.1f}" height="24" rx="12" fill="{col}" fill-opacity=".12" '
+             f'stroke="{col}" stroke-opacity=".6"/>{pulse}<circle cx="{W - 24 - lw + 11:.1f}" cy="38" r="4" fill="{col}"/>'
+             f'<text class="ci" x="{W - 24 - lw + 20:.1f}" y="42" fill="{col}">CI {label}</text>' if run else "")
+    status = f" CI {label}." if run else ""
+    return f"""{svg_open(W, H, f"{p['name']}: {p['tag']}. {p['desc']}{status}")}
 <style>
-  .bg{{fill:#0d1117;stroke:#30363d}} .n{{fill:#e6edf3;font:700 17px {SANS}}} .d{{fill:#9198a1;font:13px {SANS}}}
-  .chip{{fill:#161b22;stroke:#30363d}} .cl{{fill:#9198a1;font:11.5px {SANS}}} .ar{{fill:#6e7681}} .dk{{fill:#e6edf3}}
+  .bg{{fill:#0d1117;stroke:#30363d}} .n{{fill:#e6edf3;font:700 17px {SANS}}} .t{{fill:{CYAN};font:600 12.5px {SANS}}}
+  .d{{fill:#9198a1;font:13px {SANS}}} .chip{{fill:#161b22;stroke:#30363d}} .cl{{fill:#9198a1;font:11.5px {SANS}}}
+  .ar{{fill:#6e7681}} .dk{{fill:#e6edf3}} .ci{{font:600 11px {SANS}}}
+  .shine{{animation:sh 5s ease-in-out infinite}} @keyframes sh{{0%,60%{{transform:translateX(-200px)}}100%{{transform:translateX({W + 200}px)}}}}
 </style>
-<defs><linearGradient id="acc" x1="0" x2="1">
-  <stop offset="0" stop-color="{VIOLET}"><animate attributeName="stop-color" values="{VIOLET};{CYAN};{VIOLET}" dur="6s" repeatCount="indefinite"/></stop>
-  <stop offset="1" stop-color="{CYAN}"><animate attributeName="stop-color" values="{CYAN};{VIOLET};{CYAN}" dur="6s" repeatCount="indefinite"/></stop>
-</linearGradient></defs>
+<defs>
+  <linearGradient id="acc" x1="0" x2="1">
+    <stop offset="0" stop-color="{VIOLET}"><animate attributeName="stop-color" values="{VIOLET};{CYAN};{VIOLET}" dur="6s" repeatCount="indefinite"/></stop>
+    <stop offset="1" stop-color="{CYAN}"><animate attributeName="stop-color" values="{CYAN};{VIOLET};{CYAN}" dur="6s" repeatCount="indefinite"/></stop>
+  </linearGradient>
+  <linearGradient id="gl" x1="0" x2="1"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".5" stop-color="#fff" stop-opacity=".05"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+  <clipPath id="cc"><rect width="{W}" height="{H}" rx="14"/></clipPath>
+</defs>
 <rect class="bg" x=".5" y=".5" width="{W - 1}" height="{H - 1}" rx="14"/>
-<rect x="0" y="0" width="{W}" height="4" rx="2" fill="url(#acc)"/>
-<path class="ar" transform="translate(24,28) scale(1.1)" d="M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 1 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5Zm10.5-1h-8a1 1 0 0 0-1 1v6.708A2.486 2.486 0 0 1 4.5 9h8ZM5 12.25a.25.25 0 0 1 .25-.25h3.5a.25.25 0 0 1 .25.25v3.25a.25.25 0 0 1-.4.2l-1.45-1.087a.249.249 0 0 0-.3 0L5.4 15.7a.25.25 0 0 1-.4-.2Z"/>
-<text class="n" x="50" y="43">{esc(card['name'])}</text>
-<path class="ar" transform="translate({W - 40},28)" d="M3.75 2h3.5a.75.75 0 0 1 0 1.5h-3.5a.25.25 0 0 0-.25.25v8.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25v-3.5a.75.75 0 0 1 1.5 0v3.5A1.75 1.75 0 0 1 12.25 14h-8.5A1.75 1.75 0 0 1 2 12.25v-8.5C2 2.784 2.784 2 3.75 2Zm6.854-1h4.146a.25.25 0 0 1 .25.25v4.146a.25.25 0 0 1-.427.177L13.03 4.03 9.28 7.78a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042l3.75-3.75-1.543-1.543A.25.25 0 0 1 10.604 1Z"/>
+<g clip-path="url(#cc)"><rect x="0" y="0" width="{W}" height="4" fill="url(#acc)"/>
+<rect class="shine" x="0" y="0" width="140" height="{H}" fill="url(#gl)" transform="skewX(-20)"/></g>
+<path class="ar" transform="translate(24,26) scale(1.1)" d="M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 1 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5Zm10.5-1h-8a1 1 0 0 0-1 1v6.708A2.486 2.486 0 0 1 4.5 9h8ZM5 12.25a.25.25 0 0 1 .25-.25h3.5a.25.25 0 0 1 .25.25v3.25a.25.25 0 0 1-.4.2l-1.45-1.087a.249.249 0 0 0-.3 0L5.4 15.7a.25.25 0 0 1-.4-.2Z"/>
+<text class="n" x="50" y="41">{esc(trunc(p['name'], 26))}</text>
+<text class="t" x="24" y="68">{esc(p['tag'])}</text>
+{badge}
 {desc}
 {''.join(chips)}
 </svg>
 """
 
 
-# ---------------------------------------------------------------- README table
+# ---------------------------------------------------------------- footer
 
-def render_table(prs: list[dict]) -> str:
-    lines = [START, "", "| | Project | ★ | Pull request |", "|---|---|---:|---|"]
-    order = {"MERGED": 0, "OPEN": 1, "CLOSED": 2}
-    for p in sorted(prs, key=lambda p: (order[p["state"]], -p["stars"])):
-        if p["state"] == "CLOSED":
-            continue
-        mark = "🟣" if p["state"] == "MERGED" else "🟢"
-        title = p["title"].replace("|", "\\|").replace("<", "&lt;").replace(">", "&gt;")
-        lines.append(f"| {mark} | [{p['repo']}]({p['repo_url']}) | {human(p['stars'])} | [#{p['number']}]({p['url']}) {title} |")
-    stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    lines += ["", f"<sub>🟣 merged · 🟢 in review · refreshed {stamp}</sub>", "", END]
-    return "\n".join(lines)
+def build_footer(user: str) -> str:
+    W, H = 960, 120
+    waves = []
+    for i, (c, o, d) in enumerate([(VIOLET, .35, 9), (CYAN, .25, 13), (GREEN, .15, 17)]):
+        amp, base = 10 + i * 4, 70 + i * 8
+        path = f"M0,{base} " + " ".join(f"Q{x + 60},{base - amp if (x // 120) % 2 == 0 else base + amp} {x + 120},{base}"
+                                        for x in range(0, 2 * W, 120)) + f" L{2 * W},{H} L0,{H} Z"
+        waves.append(f'<path d="{path}" fill="{c}" fill-opacity="{o}"><animateTransform attributeName="transform" '
+                     f'type="translate" from="0 0" to="{-240} 0" dur="{d}s" repeatCount="indefinite"/></path>')
+    return f"""{svg_open(W, H, "Thanks for visiting")}
+<style>.f{{fill:#c9d1d9;font:600 15px {MONO}}} .s{{fill:#6e7681;font:12px {MONO}}}
+.blink{{animation:b 1.1s steps(1) infinite}} @keyframes b{{50%{{opacity:0}}}}</style>
+<defs><clipPath id="fc"><rect width="{W}" height="{H}" rx="20"/></clipPath></defs>
+<g clip-path="url(#fc)"><rect width="{W}" height="{H}" fill="#0d1117"/>{''.join(waves)}</g>
+<text x="{W / 2}" y="44" text-anchor="middle" class="f"><tspan fill="{VIOLET}">❯</tspan> exit 0 <tspan class="s">— thanks for stopping by</tspan><tspan class="blink" fill="{CYAN}"> ▌</tspan></text>
+</svg>
+"""
 
 
 # ---------------------------------------------------------------- main
@@ -555,31 +541,22 @@ def main() -> int:
         print("GITHUB_TOKEN is not set", file=sys.stderr)
         return 1
 
-    prs = fetch_prs(token, args.user)
     prof = fetch_profile(token, args.user)
-    st = summarize(prs)
+    ci = {p["slug"]: fetch_ci(token, args.user, p["repo"]) for p in PROJECTS}
 
     local = ASSETS / "avatar-embed.jpg"
-    hero_avatar = data_uri(local.read_bytes()) if local.exists() else fetch_image(f"https://github.com/{args.user}.png?size=200")
-    small = ASSETS / "avatar-sun.jpg"
-    sun = data_uri(small.read_bytes()) if small.exists() else hero_avatar
-    avatars = {p["owner"]: fetch_image(f"https://github.com/{p['owner']}.png?size=64") for p in st["projects"][:11]}
+    avatar = data_uri(local.read_bytes()) if local.exists() else fetch_image(f"https://github.com/{args.user}.png?size=200")
 
     ASSETS.mkdir(exist_ok=True)
-    (ASSETS / "hero.svg").write_text(build_hero(st, prof, args.user, hero_avatar), encoding="utf-8")
-    (ASSETS / "orbit.svg").write_text(build_orbit(st, sun, avatars), encoding="utf-8")
-    (ASSETS / "journey.svg").write_text(build_journey(prs), encoding="utf-8")
+    (ASSETS / "hero.svg").write_text(build_hero(prof, ci, args.user, avatar), encoding="utf-8")
+    (ASSETS / "pipeline.svg").write_text(build_pipeline(ci), encoding="utf-8")
     (ASSETS / "stack.svg").write_text(build_stack(prof), encoding="utf-8")
-    for card in CARDS:
-        (ASSETS / f"card-{card['slug']}.svg").write_text(build_card(card), encoding="utf-8")
-
-    text = README.read_text(encoding="utf-8")
-    block = re.compile(re.escape(START) + r".*?" + re.escape(END), re.S)
-    if not block.search(text):
-        print("README markers not found", file=sys.stderr)
-        return 1
-    README.write_text(block.sub(lambda _: render_table(prs), text), encoding="utf-8")
-    print(f"{len(prs)} pull requests, {len(st['projects'])} projects rendered")
+    (ASSETS / "footer.svg").write_text(build_footer(args.user), encoding="utf-8")
+    for p in PROJECTS:
+        (ASSETS / f"card-{p['slug']}.svg").write_text(build_card(p, ci[p["slug"]]), encoding="utf-8")
+    passing = sum(1 for r in ci.values() if r and r["conclusion"] == "success")
+    print(f"{len(prof['repos'])} public repositories, {passing}/{sum(1 for r in ci.values() if r)} pipelines green, "
+          f"rendered {datetime.now(timezone.utc):%Y-%m-%d}")
     return 0
 
 

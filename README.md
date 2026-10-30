@@ -1,68 +1,91 @@
 <p align="center">
-  <img src="assets/hero.svg" width="100%" alt="Nishant, backend developer in TypeScript and Node.js. A terminal types whoami, lists my projects and shows repository stats.">
+  <img src="assets/hero.svg" width="100%" alt="Nishant, backend engineer in TypeScript, Node.js and Python. A terminal types whoami, lists my featured projects and shows how many CI pipelines are green.">
 </p>
 
 <p align="center">
-  I build backend APIs and services in TypeScript and Node.js: auth, payments-style workflows, microservices and the databases behind them.
+  <b>I build backends that are hard to get wrong.</b><br>
+  Money that never touches floating point, approvals that need a second person, audit trails you can verify,<br>
+  and CI that typechecks, tests and builds on every push.
 </p>
 
-### Things I've built
-
-<table>
-  <tr>
-    <td width="50%"><a href="https://github.com/devnishantt/bank-management-system"><img src="assets/card-bank.svg" width="100%" alt="bank-management-system: banking API with a double-entry ledger, row-locked transfers, Idempotency-Key retries and rotating refresh tokens."></a></td>
-    <td width="50%"><a href="https://github.com/devnishantt/Hospital-Management"><img src="assets/card-hospital.svg" width="100%" alt="Hospital-Management: hospital management API with JWT rotation, Redis token blacklist, rate limiting, uploads and email."></a></td>
-  </tr>
-  <tr>
-    <td width="50%"><a href="https://github.com/devnishantt/API-Gateway-Flights"><img src="assets/card-flights.svg" width="100%" alt="Flight booking microservices: API gateway, auth, flight and booking services with a cron job that cancels stale bookings."></a></td>
-    <td width="50%"><a href="https://github.com/devnishantt/TwitterClone"><img src="assets/card-twitter.svg" width="100%" alt="TwitterClone: microblogging API with cookie-based JWT auth, Zod validation and rotating logs."></a></td>
-  </tr>
-  <tr>
-    <td width="50%"><a href="https://github.com/devnishantt/Tea-Code-Problem-Service"><img src="assets/card-teacode.svg" width="100%" alt="Tea-Code-Problem-Service: coding judge problem service with Markdown problems sanitized before storage."></a></td>
-    <td width="50%"></td>
-  </tr>
-</table>
-
 <p align="center">
-  <img src="assets/stack.svg" width="100%" alt="Tools I use: TypeScript, JavaScript, Node.js, Express, Prisma, PostgreSQL, MySQL, MongoDB, Redis, Zod, Sequelize, Python, Dart, Flutter, Git and GitHub, plus the language split of my repositories.">
+  <a href="#-what-im-building">Projects</a> ·
+  <a href="#-live-ci-board">Live CI</a> ·
+  <a href="#-how-i-build">How I build</a> ·
+  <a href="#-toolbox">Toolbox</a>
 </p>
 
 ---
 
-### Contributions to other projects
+### ⚡ What I'm building
 
-<p align="center">
-  <img src="assets/orbit.svg" width="100%" alt="Projects I have sent pull requests to, orbiting a central avatar. Planet size follows the project's stars; violet means merged, green means in review.">
-</p>
-
-<p align="center">
-  <img src="assets/journey.svg" width="100%" alt="My pull requests drawn as a git graph, oldest first, each with its project, title, date and status.">
-</p>
+<table>
+  <tr>
+    <td width="50%"><a href="https://github.com/devnishantt/ledgerline"><img src="assets/card-ledgerline.svg" width="100%" alt="Ledgerline: financial reconciliation workspace built with React, Hono, Cloudflare D1 and Zod."></a></td>
+    <td width="50%"><a href="https://github.com/devnishantt/aftermark"><img src="assets/card-aftermark.svg" width="100%" alt="Aftermark: evidence-driven incident response API built with Fastify, Bun, Zod and Cloudflare D1."></a></td>
+  </tr>
+  <tr>
+    <td width="50%"><a href="https://github.com/devnishantt/Pactrail"><img src="assets/card-pactrail.svg" width="100%" alt="Pactrail: API contract checks, OpenAPI breaking-change detection and deterministic fixtures in TypeScript."></a></td>
+    <td width="50%"><a href="https://github.com/devnishantt/tracebench"><img src="assets/card-tracebench.svg" width="100%" alt="Tracebench: local-first dataset contracts, profiling and drift reports in Python with DuckDB and Pydantic."></a></td>
+  </tr>
+  <tr>
+    <td width="50%"><a href="https://github.com/devnishantt/bank-management-system"><img src="assets/card-bank.svg" width="100%" alt="bank-management-system: banking REST API with a double-entry ledger, row-locked transfers and idempotency keys."></a></td>
+    <td width="50%"><a href="https://github.com/devnishantt/Hospital-Management"><img src="assets/card-hospital.svg" width="100%" alt="Hospital-Management: hospital management API with JWT rotation, a Redis token blacklist and rate limiting."></a></td>
+  </tr>
+</table>
 
 <details>
-<summary><b>Every pull request, with links</b></summary>
+<summary><b>What makes each one interesting</b></summary>
 <br>
 
-<!-- oss:start -->
-
-| | Project | ★ | Pull request |
-|---|---|---:|---|
-| 🟣 | [foss42/apidash](https://github.com/foss42/apidash) | 2.9k | [#1828](https://github.com/foss42/apidash/pull/1828) fix: preserve disabled env vars after JS script execution |
-| 🟢 | [processing/p5.js](https://github.com/processing/p5.js) | 24.3k | [#9226](https://github.com/processing/p5.js/pull/9226) fix(core): keep pixelDensity when createCanvas replaces the renderer |
-| 🟢 | [foss42/apidash](https://github.com/foss42/apidash) | 2.9k | [#1834](https://github.com/foss42/apidash/pull/1834) feat: add GraphQL variables JSON editor |
-| 🟢 | [jjjake/internetarchive](https://github.com/jjjake/internetarchive) | 1.9k | [#811](https://github.com/jjjake/internetarchive/pull/811) Honor ignore_existing during Item.download dry_run |
-| 🟢 | [CrossGL/crosstl](https://github.com/CrossGL/crosstl) | 1.7k | [#3612](https://github.com/CrossGL/crosstl/pull/3612) Number HIP __constant__ bindings as the CUDA importer does |
-| 🟢 | [zulip/python-zulip-api](https://github.com/zulip/python-zulip-api) | 407 | [#924](https://github.com/zulip/python-zulip-api/pull/924) zulip: Optionally retry requests that hit RATE_LIMIT_HIT. |
-| 🟢 | [mloda-ai/mloda](https://github.com/mloda-ai/mloda) | 98 | [#2427](https://github.com/mloda-ai/mloda/pull/2427) test: share the young-first gc reclaim loop in tests/helpers |
-| 🟢 | [accordproject/template-playground](https://github.com/accordproject/template-playground) | 77 | [#996](https://github.com/accordproject/template-playground/pull/996) fix(build): emit index.html for known SPA routes so S3 deep links return 200 |
-| 🟢 | [aboutcode-org/license-expression](https://github.com/aboutcode-org/license-expression) | 74 | [#141](https://github.com/aboutcode-org/license-expression/pull/141) Bump setuptools build requirement and drop unused wheel |
-| 🟢 | [CCExtractor/sample-platform](https://github.com/CCExtractor/sample-platform) | 30 | [#1220](https://github.com/CCExtractor/sample-platform/pull/1220) [FIX] Add timeouts on outbound HTTP calls outside mod_ci |
-| 🟢 | [ohcnetwork/create-care-mfe-plug](https://github.com/ohcnetwork/create-care-mfe-plug) | 3 | [#8](https://github.com/ohcnetwork/create-care-mfe-plug/pull/8) feat: add decimal utility helpers to the plugin template |
-
-<sub>🟣 merged · 🟢 in review · refreshed 2026-10-30</sub>
-
-<!-- oss:end -->
+| Project | The hard part |
+|---|---|
+| [**Ledgerline**](https://github.com/devnishantt/ledgerline) | Integer minor-unit money, one-to-one matching that leaves ambiguous pairs unresolved instead of guessing, a separate reviewer credential for approvals, and a hash-linked audit chain that detects a missing tail. |
+| [**Aftermark**](https://github.com/devnishantt/aftermark) | An incident only closes after two non-creator principals approve the *current* SHA-256 evidence manifest. New evidence makes old approvals stale. Every write claims the next revision, so conflicting writers roll back their whole batch. |
+| [**Pactrail**](https://github.com/devnishantt/Pactrail) | A deliberately conservative OpenAPI diff: anything it can't prove safe is flagged for review and blocks CI. Backed by 639 tests, most of them schema boundary cases. |
+| [**Tracebench**](https://github.com/devnishantt/tracebench) | Drift checks that report "incomparable" instead of quietly saying "stable". Bounded CSV/JSONL/Parquet ingestion, exact decimal bounds and fingerprinted, offline HTML reports. |
+| [**bank-management-system**](https://github.com/devnishantt/bank-management-system) | A double-entry ledger you can check against the balances, transfers that lock rows in a fixed order so they can't deadlock, and `Idempotency-Key` retries that never double-charge. |
+| [**Hospital-Management**](https://github.com/devnishantt/Hospital-Management) | Access and refresh token rotation, a Redis-backed token blacklist, rate limiting, uploads and email in a layered Express service. |
 
 </details>
 
-<p align="center"><sub>Graphics generated daily by <a href="scripts/build_profile.py"><code>scripts/build_profile.py</code></a> from the GitHub API · icons from <a href="https://simpleicons.org">Simple Icons</a> (CC0)</sub></p>
+---
+
+### 🟢 Live CI board
+
+<p align="center">
+  <img src="assets/pipeline.svg" width="100%" alt="The latest main-branch GitHub Actions run for each featured project, with its steps, duration and result.">
+</p>
+
+<p align="center"><sub>Read straight from the GitHub Actions API every day. If a pipeline goes red, this board shows it.</sub></p>
+
+---
+
+### 🧭 How I build
+
+```ts
+const principles = {
+  money:       "integers in minor units, never floats",
+  concurrency: "claim a revision or roll back; no lost updates",
+  approvals:   "the person who opens it is not the person who signs it off",
+  history:     "append-only and hash-linked, so tampering shows",
+  uncertainty: "say 'needs review' or 'incomparable' instead of guessing",
+  shipping:    "typecheck, test, build and audit on every push",
+} as const;
+```
+
+---
+
+### 🛠 Toolbox
+
+<p align="center">
+  <img src="assets/stack.svg" width="100%" alt="Tools I use: TypeScript, JavaScript, Node.js, Python, Express, Fastify, Hono, Bun, React, Zod, Prisma, PostgreSQL, Redis, Cloudflare, DuckDB, Pydantic, Vitest, Pytest, Docker, GitHub Actions, MySQL, MongoDB, Git and GitHub, plus the language split of my public repositories.">
+</p>
+
+---
+
+<p align="center">
+  <img src="assets/footer.svg" width="100%" alt="exit 0. Thanks for stopping by.">
+</p>
+
+<p align="center"><sub>Every graphic here is a self-contained SVG, rebuilt daily from the GitHub API by <a href="scripts/build_profile.py"><code>scripts/build_profile.py</code></a> (standard library only) · icons from <a href="https://simpleicons.org">Simple Icons</a> (CC0)</sub></p>
