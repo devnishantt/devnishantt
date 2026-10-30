@@ -6,6 +6,8 @@ Writes, all self-contained (images embedded, no third-party services):
   assets/pipeline.svg   live CI board: the latest main-branch run of every featured project
   assets/card-*.svg     project cards with a live CI status light
   assets/stack.svg      tools I use, plus the language split of my own repositories
+  assets/heartbeat.svg  daily contributions drawn as an ECG trace
+  assets/access-log.svg the latest requests made to the issue-driven profile API (scripts/profile_api.py)
   assets/footer.svg     animated sign-off
 
 Standard library only. Usage: GITHUB_TOKEN=... python scripts/build_profile.py [--user LOGIN]
@@ -39,48 +41,48 @@ STACK = ["typescript", "javascript", "nodedotjs", "python", "express", "fastify"
 
 # Featured projects, newest work first. `steps` mirrors each repository's CI workflow.
 PROJECTS = [
-    {"slug": "ledgerline", "repo": "ledgerline", "name": "Ledgerline", "lang": "typescript",
+    {"slug": "ledgerline", "hard": 'Integer minor-unit money, ambiguous matches left unresolved instead of guessed, a separate reviewer credential for approvals and a hash-linked audit chain that detects a missing tail.', "repo": "ledgerline", "name": "Ledgerline", "lang": "typescript",
      "tag": "Financial reconciliation workspace",
      "desc": "Matches bank statements against ledger records with exact minor-unit money, a separate "
              "reviewer credential for approvals and a hash-linked audit trail.",
      "stack": ["react", "hono", "cloudflare", "zod"],
      "steps": ["install", "typecheck", "test", "build", "audit"]},
-    {"slug": "aftermark", "repo": "aftermark", "name": "Aftermark", "lang": "typescript",
+    {"slug": "aftermark", "hard": 'An incident closes only after two non-creator principals approve the current SHA-256 evidence manifest; new evidence makes old approvals stale, and every write claims the next revision.', "repo": "aftermark", "name": "Aftermark", "lang": "typescript",
      "tag": "Evidence-driven incident response API",
      "desc": "Incidents close only when two independent people approve the exact evidence manifest. "
              "Hash-linked history and revision-claimed writes.",
      "stack": ["fastify", "bun", "zod", "cloudflare"],
      "steps": ["install", "typecheck", "test", "build", "docker"]},
-    {"slug": "pactrail", "repo": "Pactrail", "name": "Pactrail", "lang": "typescript",
+    {"slug": "pactrail", "hard": 'A conservative OpenAPI diff: anything it cannot prove safe is flagged for review and blocks CI. Backed by 639 tests, most of them schema boundary cases.', "repo": "Pactrail", "name": "Pactrail", "lang": "typescript",
      "tag": "API contract checks and OpenAPI diffing",
      "desc": "Library and CLI that validates payloads against OpenAPI schemas, flags breaking changes "
              "between versions and runs deterministic response fixtures.",
      "stack": ["typescript", "nodedotjs", "zod", "vitest"],
      "steps": ["install", "typecheck", "test", "smoke", "pack"]},
-    {"slug": "tracebench", "repo": "tracebench", "name": "Tracebench", "lang": "python",
+    {"slug": "tracebench", "hard": "Drift checks that report 'incomparable' instead of quietly saying 'stable', with bounded ingestion, exact decimal bounds and fingerprinted offline reports.", "repo": "tracebench", "name": "Tracebench", "lang": "python",
      "tag": "Local-first dataset contracts and drift",
      "desc": "Checks CSV, JSONL and Parquet files against explicit contracts, profiles them and writes "
              "reproducible drift reports in JSON, Markdown and HTML.",
      "stack": ["python", "duckdb", "pydantic", "pytest"],
      "steps": ["install", "lint", "mypy", "test", "build"]},
-    {"slug": "bank", "repo": "bank-management-system", "name": "bank-management-system", "lang": "typescript",
+    {"slug": "bank", "hard": 'A double-entry ledger you can check against balances, transfers that lock rows in a fixed order so they cannot deadlock, and Idempotency-Key retries that never double-charge.', "repo": "bank-management-system", "name": "bank-management-system", "lang": "typescript",
      "tag": "Banking REST API",
      "desc": "Double-entry ledger, row-locked transfers that cannot deadlock, Idempotency-Key retries "
              "and rotating refresh tokens.",
      "stack": ["express", "prisma", "postgresql", "docker"],
      "steps": ["install", "typecheck", "test", "build"]},
-    {"slug": "hospital", "repo": "Hospital-Management", "name": "Hospital-Management", "lang": "typescript",
+    {"slug": "hospital", "hard": 'Access and refresh token rotation, a Redis-backed token blacklist, rate limiting, uploads and email in a layered Express service.', "repo": "Hospital-Management", "name": "Hospital-Management", "lang": "typescript",
      "tag": "Hospital management API",
      "desc": "JWT access and refresh tokens with rotation, a Redis-backed token blacklist, rate "
              "limiting, file uploads and email.",
      "stack": ["express", "prisma", "postgresql", "redis"],
-     "steps": []},
+     "steps": ["install", "generate", "typecheck", "build", "audit"]},
 ]
 
 PROFILE_QUERY = """
 query($login: String!) { user(login: $login) {
   createdAt
-  contributionsCollection { contributionCalendar { totalContributions } }
+  contributionsCollection { contributionCalendar { totalContributions weeks { contributionDays { date contributionCount } } } }
   repositories(ownerAffiliations: OWNER, isFork: false, first: 100, orderBy: {field: PUSHED_AT, direction: DESC}) {
     nodes { name isPrivate languages(first: 10) { edges { size node { name color } } } }
   }
@@ -118,6 +120,8 @@ def fetch_profile(token: str, user: str) -> dict:
     top = sorted(langs.items(), key=lambda kv: -kv[1][0])
     return {"since": u["createdAt"][:4], "repos": [r["name"] for r in repos],
             "contributions": u["contributionsCollection"]["contributionCalendar"]["totalContributions"],
+            "days": [(d["date"], d["contributionCount"])
+                     for w in u["contributionsCollection"]["contributionCalendar"]["weeks"] for d in w["contributionDays"]],
             "languages": [(name, size / total, color) for name, (size, color) in top if size / total >= 0.005]}
 
 
@@ -509,6 +513,146 @@ def build_card(p: dict, run: dict | None) -> str:
 """
 
 
+# ---------------------------------------------------------------- heartbeat
+
+def streak(days: list[tuple[str, int]]) -> int:
+    run, seq = 0, list(days)
+    if seq and seq[-1][1] == 0:  # today may simply not have started yet
+        seq = seq[:-1]
+    for _, c in reversed(seq):
+        if c == 0:
+            break
+        run += 1
+    return run
+
+
+def build_heartbeat(prof: dict) -> str:
+    days = prof["days"][-28:] or [("", 0)]
+    W, H = 960, 240
+    gx0, gx1, base = 34, 640, 138
+    seg = (gx1 - gx0) / len(days)
+    peak = max(math.sqrt(c) for _, c in days) or 1
+    d = f"M{gx0},{base}"
+    for i, (_, c) in enumerate(days):
+        x = gx0 + i * seg
+        if c == 0:
+            d += f" L{x + seg:.1f},{base}"
+            continue
+        a = 14 + 72 * math.sqrt(c) / peak
+        d += (f" L{x + seg * .14:.1f},{base} Q{x + seg * .22:.1f},{base - 5} {x + seg * .3:.1f},{base}"
+              f" L{x + seg * .4:.1f},{base + 6} L{x + seg * .5:.1f},{base - a:.1f} L{x + seg * .6:.1f},{base + a * .3:.1f}"
+              f" L{x + seg * .68:.1f},{base} Q{x + seg * .8:.1f},{base - 9} {x + seg * .92:.1f},{base} L{x + seg:.1f},{base}")
+    week = sum(c for _, c in prof["days"][-7:])
+    best = max(prof["days"], key=lambda dc: dc[1]) if prof["days"] else ("", 0)
+    best_label = datetime.fromisoformat(best[0]).strftime("%b %d") if best[0] else "-"
+    first = datetime.fromisoformat(days[0][0]).strftime("%b %d") if days[0][0] else ""
+    sweep, gw = 7, gx1 - gx0
+    stats = [("streak", f"{streak(prof['days'])} days"), ("past year", f"{prof['contributions']:,}"),
+             ("busiest day", f"{best[1]} · {best_label}")]
+    rows = "".join(f'<text x="700" y="{150 + i * 26}" class="k">{k}</text>'
+                   f'<text x="926" y="{150 + i * 26}" class="v" text-anchor="end">{esc(v)}</text>'
+                   for i, (k, v) in enumerate(stats))
+    return f"""{svg_open(W, H, f"Contribution heartbeat: {week} contributions in the last 7 days, {prof['contributions']} in the past year")}
+<style>
+  .h{{fill:#e6edf3;font:600 14px {MONO}}} .c{{fill:#6e7681;font:14px {MONO}}} .ax{{fill:#4b6b57;font:11px {MONO}}}
+  .big{{fill:{GREEN};font:700 54px {MONO}}} .unit{{fill:#7ee2a8;font:600 12px {MONO};letter-spacing:1px}}
+  .k{{fill:#6e7681;font:12.5px {MONO}}} .v{{fill:#c9d1d9;font:600 12.5px {MONO}}}
+  .beat{{animation:beat 1.2s ease-in-out infinite;transform-box:fill-box;transform-origin:center}}
+  @keyframes beat{{0%,100%{{transform:scale(1)}}15%{{transform:scale(1.25)}}30%{{transform:scale(.95)}}45%{{transform:scale(1.12)}}}}
+</style>
+<defs>
+  <pattern id="grid" width="12" height="12" patternUnits="userSpaceOnUse"><path d="M12 0H0V12" fill="none" stroke="{GREEN}" stroke-opacity=".07"/></pattern>
+  <pattern id="grid5" width="60" height="60" patternUnits="userSpaceOnUse"><path d="M60 0H0V60" fill="none" stroke="{GREEN}" stroke-opacity=".12"/></pattern>
+  <filter id="glow" x="-5%" y="-30%" width="110%" height="160%"><feGaussianBlur stdDeviation="2.4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  <linearGradient id="head" x1="0" x2="1"><stop offset="0" stop-color="{GREEN}" stop-opacity="0"/><stop offset="1" stop-color="{GREEN}" stop-opacity=".35"/></linearGradient>
+  <clipPath id="sweep"><rect x="{gx0}" y="30" width="0" height="180">
+    <animate attributeName="width" values="0;{gw}" dur="{sweep}s" repeatCount="indefinite"/></rect></clipPath>
+</defs>
+<rect width="{W}" height="{H}" rx="20" fill="#06110b"/>
+<rect x="{gx0 - 14}" y="62" width="{gw + 28}" height="150" fill="url(#grid)"/>
+<rect x="{gx0 - 14}" y="62" width="{gw + 28}" height="150" fill="url(#grid5)"/>
+<rect x=".5" y=".5" width="{W - 1}" height="{H - 1}" rx="20" fill="none" stroke="#1d3b29"/>
+<text x="34" y="42" class="h"><tspan fill="{GREEN}">❯</tspan> watch --interval 1d contributions <tspan class="c"># last 4 weeks, one beat per day</tspan></text>
+<path d="{d}" fill="none" stroke="{GREEN}" stroke-opacity=".18" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="{d}" fill="none" stroke="{GREEN}" stroke-width="2" stroke-linejoin="round" clip-path="url(#sweep)" filter="url(#glow)"/>
+<rect x="{gx0 - 40}" y="62" width="40" height="150" fill="url(#head)">
+  <animate attributeName="x" values="{gx0 - 40};{gx1 - 40}" dur="{sweep}s" repeatCount="indefinite"/></rect>
+<text x="{gx0}" y="228" class="ax">{first}</text><text x="{gx1}" y="228" class="ax" text-anchor="end">today</text>
+<line x1="676" y1="62" x2="676" y2="212" stroke="#1d3b29"/>
+<path class="beat" transform="translate(700,64) scale(1.1)" fill="{RED}" d="M8 14.2 6.9 13.2C2.9 9.6.3 7.2.3 4.3.3 1.9 2.2 0 4.6 0c1.3 0 2.6.6 3.4 1.6C8.8.6 10.1 0 11.4 0c2.4 0 4.3 1.9 4.3 4.3 0 2.9-2.6 5.3-6.6 8.9z"/>
+<text x="726" y="78" class="unit">CONTRIBUTIONS · 7D</text>
+<text x="700" y="124" class="big">{week}</text>
+{rows}
+</svg>
+"""
+
+
+# ---------------------------------------------------------------- access log
+
+LOG_FILE = ROOT / "data" / "access-log.json"
+
+
+def load_log() -> dict:
+    if LOG_FILE.exists():
+        return json.loads(LOG_FILE.read_text(encoding="utf-8"))
+    return {"served": 0, "entries": []}
+
+
+def fmt_rtt(seconds: int) -> str:
+    return f"{seconds // 60}m {seconds % 60:02d}s" if seconds >= 60 else f"{seconds}s"
+
+
+def status_color(code: int) -> str:
+    return VIOLET if code == 418 else GREEN if code < 300 else AMBER if code < 500 else RED
+
+
+def build_access_log(log: dict, user: str) -> str:
+    rows = log["entries"][-8:][::-1]
+    W, top, rh = 960, 96, 32
+    H = top + max(len(rows), 2) * rh + 58
+    body = []
+    if not rows:
+        body.append(f'<text x="40" y="{top + 20}" class="row0">no requests yet. Be the first: open an issue titled '
+                    f'<tspan fill="{CYAN}">GET /</tspan></text>')
+    for i, e in enumerate(rows):
+        y = top + i * rh + 16
+        col = status_color(e["status"])
+        ts = datetime.fromisoformat(e["at"].replace("Z", "+00:00")).strftime("%d/%b %H:%M")
+        anim = (f' style="animation:in .7s ease-out both"' if i == 0 else "")
+        hl = (f'<rect x="20" y="{y - 21}" width="{W - 40}" height="{rh - 2}" rx="8" fill="{CYAN}" fill-opacity=".07">'
+              f'<animate attributeName="fill-opacity" values=".16;.04;.16" dur="3s" repeatCount="indefinite"/></rect>' if i == 0 else "")
+        body.append(
+            f'<g{anim}>{hl}'
+            f'<text x="40" y="{y}" class="r ts">{ts}</text>'
+            f'<text x="186" y="{y}" class="r" fill="{CYAN}">@{esc(trunc(e["user"], 16))}</text>'
+            f'<text x="330" y="{y}" class="r"><tspan fill="{VIOLET}" font-weight="700">{esc(e["method"])}</tspan> '
+            f'<tspan fill="#e6edf3">{esc(trunc(e["path"], 34))}</tspan></text>'
+            f'<rect x="{W - 190}" y="{y - 15}" width="46" height="21" rx="10" fill="{col}" fill-opacity=".14" stroke="{col}" stroke-opacity=".7"/>'
+            f'<text x="{W - 167}" y="{y}" class="st" fill="{col}" text-anchor="middle">{e["status"]}</text>'
+            f'<text x="{W - 40}" y="{y}" class="ms" text-anchor="end">{fmt_rtt(e["rtt"])}</text></g>')
+    yb = top + max(len(rows), 2) * rh + 16
+    return f"""{svg_open(W, H, f"Access log of the issue-driven profile API: {log['served']} requests served")}
+<style>
+  .h{{fill:#e6edf3;font:600 14px {MONO}}} .c{{fill:#6e7681;font:14px {MONO}}} .r{{font:13px {MONO}}}
+  .ts{{fill:#6e7681}} .st{{font:700 11.5px {MONO}}} .ms{{fill:#8b949e;font:12px {MONO}}} .row0{{fill:#8b949e;font:13px {MONO}}}
+  .cnt{{fill:{GREEN};font:600 12px {MONO}}} .hd{{fill:#6e7681;font:600 10.5px {MONO};letter-spacing:1px}}
+  @keyframes in{{from{{opacity:0;transform:translateY(-10px)}}to{{opacity:1;transform:none}}}}
+  .blink{{animation:b 1.1s steps(1) infinite}} @keyframes b{{50%{{opacity:0}}}}
+</style>
+<rect width="{W}" height="{H}" rx="20" fill="#0d1117"/>
+<rect x=".5" y=".5" width="{W - 1}" height="{H - 1}" rx="20" fill="none" stroke="#30363d"/>
+<text x="34" y="44" class="h"><tspan fill="{VIOLET}">❯</tspan> tail -f /var/log/{esc(user)}/access.log</text>
+<circle cx="{W - 186}" cy="40" r="4" fill="{GREEN}"><animate attributeName="opacity" values="1;.2;1" dur="1.6s" repeatCount="indefinite"/></circle>
+<text x="{W - 40}" y="44" class="cnt" text-anchor="end">{log['served']:,} requests served</text>
+<line x1="20" y1="64" x2="{W - 20}" y2="64" stroke="#21262d"/>
+<text x="40" y="84" class="hd">TIME</text><text x="186" y="84" class="hd">CALLER</text><text x="330" y="84" class="hd">REQUEST</text>
+<text x="{W - 167}" y="84" class="hd" text-anchor="middle">STATUS</text><text x="{W - 40}" y="84" class="hd" text-anchor="end">REPLIED IN</text>
+{''.join(body)}
+<text x="40" y="{yb + 8}" class="r"><tspan fill="{VIOLET}">❯</tspan><tspan class="blink" fill="{CYAN}"> ▌</tspan></text>
+</svg>
+"""
+
+
 # ---------------------------------------------------------------- footer
 
 def build_footer(user: str) -> str:
@@ -552,6 +696,8 @@ def main() -> int:
     (ASSETS / "pipeline.svg").write_text(build_pipeline(ci), encoding="utf-8")
     (ASSETS / "stack.svg").write_text(build_stack(prof), encoding="utf-8")
     (ASSETS / "footer.svg").write_text(build_footer(args.user), encoding="utf-8")
+    (ASSETS / "heartbeat.svg").write_text(build_heartbeat(prof), encoding="utf-8")
+    (ASSETS / "access-log.svg").write_text(build_access_log(load_log(), args.user), encoding="utf-8")
     for p in PROJECTS:
         (ASSETS / f"card-{p['slug']}.svg").write_text(build_card(p, ci[p["slug"]]), encoding="utf-8")
     passing = sum(1 for r in ci.values() if r and r["conclusion"] == "success")
