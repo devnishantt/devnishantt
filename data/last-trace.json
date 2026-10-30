@@ -1,0 +1,125 @@
+{
+ "trace_id": "f15125f44c7ad4c0",
+ "request": "GET /ci",
+ "caller": "devnishantt",
+ "at": "2026-10-30T22:13:49Z",
+ "total": 13.632,
+ "spans": [
+  {
+   "svc": "github",
+   "name": "issues.opened",
+   "start": 0.0,
+   "end": 0.0,
+   "depth": 0
+  },
+  {
+   "svc": "actions",
+   "name": "queued",
+   "start": 0.0,
+   "end": 5.0,
+   "depth": 0,
+   "coarse": true
+  },
+  {
+   "svc": "actions",
+   "name": "job respond",
+   "start": 5.0,
+   "end": null,
+   "depth": 0
+  },
+  {
+   "svc": "runner",
+   "name": "set up job",
+   "start": 6.0,
+   "end": 7.0,
+   "depth": 1,
+   "coarse": true
+  },
+  {
+   "svc": "runner",
+   "name": "checkout",
+   "start": 7.0,
+   "end": 8.0,
+   "depth": 1,
+   "coarse": true
+  },
+  {
+   "svc": "runner",
+   "name": "setup-python",
+   "start": 8.0,
+   "end": 8.0,
+   "depth": 1,
+   "coarse": true
+  },
+  {
+   "svc": "python",
+   "name": "handle request",
+   "start": 8.415,
+   "end": 11.438,
+   "depth": 1
+  },
+  {
+   "svc": "api",
+   "name": "parse",
+   "start": 8.415,
+   "end": 8.415,
+   "depth": 2
+  },
+  {
+   "svc": "api",
+   "name": "route GET /ci",
+   "start": 8.415,
+   "end": 10.101,
+   "depth": 2
+  },
+  {
+   "svc": "github.api",
+   "name": "runs ledgerline",
+   "start": 8.416,
+   "end": 8.65,
+   "depth": 3
+  },
+  {
+   "svc": "github.api",
+   "name": "runs aftermark",
+   "start": 8.65,
+   "end": 8.923,
+   "depth": 3
+  },
+  {
+   "svc": "github.api",
+   "name": "runs Pactrail",
+   "start": 8.923,
+   "end": 9.239,
+   "depth": 3
+  },
+  {
+   "svc": "github.api",
+   "name": "+3 more calls",
+   "start": 9.239,
+   "end": 10.101,
+   "depth": 3
+  },
+  {
+   "svc": "github.api",
+   "name": "comment #2",
+   "start": 10.101,
+   "end": 10.697,
+   "depth": 2
+  },
+  {
+   "svc": "github.api",
+   "name": "close #2",
+   "start": 10.697,
+   "end": 11.438,
+   "depth": 2
+  },
+  {
+   "svc": "log",
+   "name": "commit + push",
+   "start": 11.632,
+   "end": null,
+   "depth": 1
+  }
+ ]
+}

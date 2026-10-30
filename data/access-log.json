@@ -1,5 +1,5 @@
 {
- "served": 1,
+ "served": 2,
  "entries": [
   {
    "at": "2026-10-30T21:44:07Z",
@@ -8,6 +8,14 @@
    "path": "/projects/ledgerline",
    "status": 200,
    "rtt": 9
+  },
+  {
+   "at": "2026-10-30T22:13:49Z",
+   "user": "devnishantt",
+   "method": "GET",
+   "path": "/ci",
+   "status": 200,
+   "rtt": 10
   }
  ]
 }
