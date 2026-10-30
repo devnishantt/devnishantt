@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="960" height="28" viewBox="0 0 960 28" role="img" aria-label="">
+<defs><linearGradient id="pk" x1="0" x2="1"><stop offset="0" stop-color="#39d0d8" stop-opacity="0"/><stop offset="1" stop-color="#39d0d8"/></linearGradient>
+<linearGradient id="ln" x1="0" x2="1"><stop offset="0" stop-color="#30363d" stop-opacity="0"/><stop offset=".5" stop-color="#30363d"/><stop offset="1" stop-color="#30363d" stop-opacity="0"/></linearGradient></defs>
+<line x1="0" y1="14" x2="960" y2="14" stroke="url(#ln)" stroke-width="1.5"/>
+<circle cx="60" cy="14" r="2.5" fill="#30363d"/><circle cx="180" cy="14" r="2.5" fill="#30363d"/><circle cx="300" cy="14" r="2.5" fill="#30363d"/><circle cx="420" cy="14" r="2.5" fill="#30363d"/><circle cx="540" cy="14" r="2.5" fill="#30363d"/><circle cx="660" cy="14" r="2.5" fill="#30363d"/><circle cx="780" cy="14" r="2.5" fill="#30363d"/><circle cx="900" cy="14" r="2.5" fill="#30363d"/>
+<rect y="12.5" width="90" height="3" rx="1.5" fill="url(#pk)"><animate attributeName="x" values="-90;960" dur="4.5s" repeatCount="indefinite"/></rect>
+<rect y="12.5" width="50" height="3" rx="1.5" fill="url(#pk)" opacity=".5"><animate attributeName="x" values="-50;960" dur="7s" begin="-3s" repeatCount="indefinite"/></rect>
+</svg>

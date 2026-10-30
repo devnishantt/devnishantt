@@ -8,6 +8,10 @@ Writes, all self-contained (images embedded, no third-party services):
   assets/stack.svg      tools I use, plus the language split of my own repositories
   assets/heartbeat.svg  daily contributions drawn as an ECG trace
   assets/access-log.svg the latest requests made to the issue-driven profile API (scripts/profile_api.py)
+  assets/divider.svg    animated section divider
+  assets/h-*.svg        typed section headings
+  assets/principles.svg how I build, rendered as a passing test run
+  assets/trace.svg      written by scripts/profile_api.py: a waterfall trace of the latest API request
   assets/footer.svg     animated sign-off
 
 Standard library only. Usage: GITHUB_TOKEN=... python scripts/build_profile.py [--user LOGIN]
@@ -557,8 +561,6 @@ def build_heartbeat(prof: dict) -> str:
   .h{{fill:#e6edf3;font:600 14px {MONO}}} .c{{fill:#6e7681;font:14px {MONO}}} .ax{{fill:#4b6b57;font:11px {MONO}}}
   .big{{fill:{GREEN};font:700 54px {MONO}}} .unit{{fill:#7ee2a8;font:600 12px {MONO};letter-spacing:1px}}
   .k{{fill:#6e7681;font:12.5px {MONO}}} .v{{fill:#c9d1d9;font:600 12.5px {MONO}}}
-  .beat{{animation:beat 1.2s ease-in-out infinite;transform-box:fill-box;transform-origin:center}}
-  @keyframes beat{{0%,100%{{transform:scale(1)}}15%{{transform:scale(1.25)}}30%{{transform:scale(.95)}}45%{{transform:scale(1.12)}}}}
 </style>
 <defs>
   <pattern id="grid" width="12" height="12" patternUnits="userSpaceOnUse"><path d="M12 0H0V12" fill="none" stroke="{GREEN}" stroke-opacity=".07"/></pattern>
@@ -579,8 +581,9 @@ def build_heartbeat(prof: dict) -> str:
   <animate attributeName="x" values="{gx0 - 40};{gx1 - 40}" dur="{sweep}s" repeatCount="indefinite"/></rect>
 <text x="{gx0}" y="228" class="ax">{first}</text><text x="{gx1}" y="228" class="ax" text-anchor="end">today</text>
 <line x1="676" y1="62" x2="676" y2="212" stroke="#1d3b29"/>
-<path class="beat" transform="translate(700,64) scale(1.1)" fill="{RED}" d="M8 14.2 6.9 13.2C2.9 9.6.3 7.2.3 4.3.3 1.9 2.2 0 4.6 0c1.3 0 2.6.6 3.4 1.6C8.8.6 10.1 0 11.4 0c2.4 0 4.3 1.9 4.3 4.3 0 2.9-2.6 5.3-6.6 8.9z"/>
-<text x="726" y="78" class="unit">CONTRIBUTIONS · 7D</text>
+<circle cx="706" cy="73" r="5" fill="{GREEN}"/>
+<circle cx="706" cy="73" r="5" fill="none" stroke="{GREEN}" stroke-width="1.5"><animate attributeName="r" values="5;13" dur="1.2s" repeatCount="indefinite"/><animate attributeName="opacity" values=".9;0" dur="1.2s" repeatCount="indefinite"/></circle>
+<text x="722" y="78" class="unit">LIVE · CONTRIBUTIONS · 7D</text>
 <text x="700" y="124" class="big">{week}</text>
 {rows}
 </svg>
@@ -653,6 +656,214 @@ def build_access_log(log: dict, user: str) -> str:
 """
 
 
+# ---------------------------------------------------------------- trace
+
+SVC_COLOR = {"github": "#8b949e", "actions": AMBER, "runner": "#58a6ff", "git": "#f78166",
+             "python": "#79c0ff", "api": VIOLET, "github.api": CYAN, "log": GREEN}
+
+
+def fmt_span(seconds: float, coarse: bool) -> str:
+    if coarse and seconds < 1:
+        return "<1 s"
+    if seconds < 1:
+        return f"{seconds * 1000:.0f} ms"
+    return f"{seconds:.1f} s" if seconds < 10 else f"{seconds:.0f} s"
+
+
+def build_trace(tr: dict) -> str:
+    """Waterfall of one profile-API request. Spans: {svc, name, start, end|None, depth, coarse}."""
+    spans = tr["spans"]
+    total = max(tr["total"], max((s["end"] or 0) for s in spans), 1.0)
+    W, X0, X1, top, rh = 960, 330, 860, 112, 30
+    H = top + len(spans) * rh + 52
+    cycle = 6.0
+    tx = lambda t: X0 + (X1 - X0) * min(max(t, 0), total) / total  # noqa: E731
+    ticks = "".join(f'<line x1="{tx(total * f):.1f}" y1="{top - 18}" x2="{tx(total * f):.1f}" y2="{H - 46}" class="tk"/>'
+                    f'<text x="{tx(total * f):.1f}" y="{top - 24}" class="ax" text-anchor="middle">{fmt_span(total * f, False) if f else "0"}</text>'
+                    for f in (0, .25, .5, .75, 1))
+    rows = []
+    for i, s in enumerate(spans):
+        y = top + i * rh
+        col = SVC_COLOR.get(s["svc"], GREY)
+        a, b = tx(s["start"]), tx(s["end"] if s["end"] is not None else total)
+        w = max(b - a, 3)
+        appear = s["start"] / total * 0.55
+        k = kt(0, appear, appear + 0.08, 0.92, 1)
+        indent = 40 + s["depth"] * 16
+        tree = (f'<path d="M{indent - 10},{y - 22} V{y - 4} H{indent - 3}" class="tree"/>' if s["depth"] else "")
+        if s["end"] is None:
+            bar = (f'<rect x="{a:.1f}" y="{y - 13}" width="{w:.1f}" height="14" rx="3" fill="url(#flight)" stroke="{col}" stroke-width="1">'
+                   f'<animate attributeName="width" values="0;0;{w:.1f};{w:.1f};0" keyTimes="{k}" dur="{cycle}s" repeatCount="indefinite"/></rect>')
+            label = "in flight"
+        elif s["end"] == s["start"] and s["svc"] == "github":
+            bar = (f'<path d="M{a:.1f},{y - 13} l7,7 l-7,7 l-7,-7 Z" fill="{col}">'
+                   f'<animate attributeName="opacity" values="0;0;1;1;0" keyTimes="{k}" dur="{cycle}s" repeatCount="indefinite"/></path>')
+            label = "event"
+        else:
+            bar = (f'<rect x="{a:.1f}" y="{y - 13}" width="{w:.1f}" height="14" rx="3" fill="{col}" fill-opacity=".85">'
+                   f'<animate attributeName="width" values="0;0;{w:.1f};{w:.1f};0" keyTimes="{k}" dur="{cycle}s" repeatCount="indefinite"/></rect>')
+            label = fmt_span(s["end"] - s["start"], s.get("coarse", False))
+        lx = min(a + w + 8, W - 40)
+        anchor = "start" if a + w + 8 < W - 90 else "end"
+        lx = lx if anchor == "start" else a - 8
+        rows.append(f'<rect x="20" y="{y - 20}" width="{W - 40}" height="{rh - 2}" rx="6" class="{"z" if i % 2 else "zz"}"/>'
+                    f'{tree}<circle cx="{indent + 4}" cy="{y - 6}" r="4" fill="{col}"/>'
+                    f'<text x="{indent + 14}" y="{y - 2}" class="sv" fill="{col}">{esc(s["svc"])}</text>'
+                    f'<text x="{indent + 14 + 7.4 * (len(s["svc"]) + 1)}" y="{y - 2}" class="nm">{esc(s["name"])}</text>'
+                    f'{bar}<text x="{lx:.1f}" y="{y - 2}" class="du" text-anchor="{anchor}">{esc(label)}</text>')
+    when = datetime.fromisoformat(tr["at"].replace("Z", "+00:00")).strftime("%Y-%m-%d %H:%M UTC")
+    return f"""{svg_open(W, H, f"Distributed trace of the latest profile API request, {tr['request']}: {len(spans)} spans")}
+<style>
+  .h{{fill:#e6edf3;font:600 14px {MONO}}} .c{{fill:#6e7681;font:13px {MONO}}} .ax{{fill:#6e7681;font:10.5px {MONO}}}
+  .tk{{stroke:#21262d;stroke-dasharray:2 4}} .sv{{font:600 12px {MONO}}} .nm{{fill:#c9d1d9;font:12px {MONO}}}
+  .du{{fill:#8b949e;font:11px {MONO}}} .z{{fill:#161b22;fill-opacity:.35}} .zz{{fill:none}}
+  .tree{{fill:none;stroke:#30363d;stroke-width:1.2}} .ft{{fill:#6e7681;font:11px {MONO}}}
+  .id{{fill:{CYAN};font:600 12px {MONO}}}
+</style>
+<defs>
+  <pattern id="flight" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+    <rect width="10" height="10" fill="{GREEN}" fill-opacity=".18"/><rect width="4" height="10" fill="{GREEN}" fill-opacity=".55"/>
+    <animateTransform attributeName="patternTransform" type="translate" from="0 0" to="10 0" dur=".8s" additive="sum" repeatCount="indefinite"/>
+  </pattern>
+</defs>
+<rect width="{W}" height="{H}" rx="20" fill="#0d1117"/>
+<rect x=".5" y=".5" width="{W - 1}" height="{H - 1}" rx="20" fill="none" stroke="#30363d"/>
+<text x="34" y="44" class="h"><tspan fill="{VIOLET}">❯</tspan> trace <tspan class="id">{tr['trace_id'][:16]}</tspan> <tspan fill="#e6edf3">{esc(trunc(tr['request'], 40))}</tspan></text>
+<text x="{W - 34}" y="44" class="c" text-anchor="end">@{esc(trunc(tr['caller'], 18))} · {when}</text>
+<line x1="20" y1="62" x2="{W - 20}" y2="62" stroke="#21262d"/>
+{ticks}
+<line x1="{X0}" y1="{top - 18}" x2="{X0}" y2="{H - 46}" stroke="{CYAN}" stroke-opacity=".7" stroke-width="1.5">
+  <animate attributeName="x1" values="{X0};{X0};{X1};{X1}" keyTimes="0;.02;.6;1" dur="{cycle}s" repeatCount="indefinite"/>
+  <animate attributeName="x2" values="{X0};{X0};{X1};{X1}" keyTimes="0;.02;.6;1" dur="{cycle}s" repeatCount="indefinite"/>
+  <animate attributeName="opacity" values="0;1;1;0;0" keyTimes="0;.02;.6;.66;1" dur="{cycle}s" repeatCount="indefinite"/></line>
+{''.join(rows)}
+<text x="34" y="{H - 20}" class="ft">{len(spans)} spans · Actions steps at 1 s resolution, handler spans timed in-process · the striped span is the commit that published this image</text>
+</svg>
+"""
+
+
+# ---------------------------------------------------------------- divider
+
+def build_divider() -> str:
+    W, H, y = 960, 28, 14
+    nodes = "".join(f'<circle cx="{x}" cy="{y}" r="2.5" fill="#30363d"/>' for x in range(60, W - 40, 120))
+    return f"""{svg_open(W, H, "")}
+<defs><linearGradient id="pk" x1="0" x2="1"><stop offset="0" stop-color="{CYAN}" stop-opacity="0"/><stop offset="1" stop-color="{CYAN}"/></linearGradient>
+<linearGradient id="ln" x1="0" x2="1"><stop offset="0" stop-color="#30363d" stop-opacity="0"/><stop offset=".5" stop-color="#30363d"/><stop offset="1" stop-color="#30363d" stop-opacity="0"/></linearGradient></defs>
+<line x1="0" y1="{y}" x2="{W}" y2="{y}" stroke="url(#ln)" stroke-width="1.5"/>
+{nodes}
+<rect y="{y - 1.5}" width="90" height="3" rx="1.5" fill="url(#pk)"><animate attributeName="x" values="-90;{W}" dur="4.5s" repeatCount="indefinite"/></rect>
+<rect y="{y - 1.5}" width="50" height="3" rx="1.5" fill="url(#pk)" opacity=".5"><animate attributeName="x" values="-50;{W}" dur="7s" begin="-3s" repeatCount="indefinite"/></rect>
+</svg>
+"""
+
+
+# ---------------------------------------------------------------- section headings
+
+HEADINGS = [
+    ("api", "0x01", "this profile is an api", "call it from the issues tab"),
+    ("work", "0x02", "what i'm building", "six backends, each with one hard problem"),
+    ("ci", "0x03", "pipelines", "latest main-branch run, every repo"),
+    ("vitals", "0x04", "vital signs", "contributions as a monitor trace"),
+    ("rules", "0x05", "how i build", "invariants over features"),
+    ("tools", "0x06", "toolbox", "what the above is made of"),
+]
+
+
+def build_heading(code: str, title: str, sub: str) -> str:
+    W, H = 960, 70
+    cw = 13.6
+    tw = len(title) * cw + 4
+    t0, t1 = 0.25, 0.25 + len(title) * 0.035
+    T = t1 + 0.4
+    return f"""{svg_open(W, H, f"{code} {title}: {sub}")}
+<style>
+  .code{{fill:{VIOLET};font:700 15px {MONO}}} .t{{fill:#e6edf3;font:700 22px {MONO}}} .s{{fill:#6e7681;font:13px {MONO}}}
+  .sl{{fill:#30363d;font:700 22px {MONO}}}
+</style>
+<defs>
+  <clipPath id="ty"><rect x="96" y="10" width="{tw:.1f}" height="40">
+    <animate attributeName="width" values="0;0;{tw:.1f};{tw:.1f}" keyTimes="{kt(0, t0 / T, t1 / T, 1)}" dur="{T:.2f}s" fill="freeze"/></rect></clipPath>
+  <linearGradient id="ul" x1="0" x2="1"><stop offset="0" stop-color="{VIOLET}"/><stop offset=".5" stop-color="{CYAN}"/><stop offset="1" stop-color="{CYAN}" stop-opacity="0"/></linearGradient>
+  <linearGradient id="pk" x1="0" x2="1"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#fff" stop-opacity=".9"/></linearGradient>
+</defs>
+<rect width="{W}" height="{H}" rx="14" fill="#0d1117"/>
+<rect x=".5" y=".5" width="{W - 1}" height="{H - 1}" rx="14" fill="none" stroke="#30363d"/>
+<text x="20" y="38" class="code">{code}</text>
+<text x="74" y="39" class="sl">/</text>
+<text x="96" y="39" class="t" clip-path="url(#ty)">{esc(title)}</text>
+<rect x="{96 + tw:.1f}" y="21" width="11" height="22" fill="{CYAN}" opacity="0">
+  <animate attributeName="opacity" values="0;0;1" keyTimes="{kt(0, t1 / T, t1 / T)}" dur="{T:.2f}s" fill="freeze"/>
+  <animate attributeName="opacity" values="1;1;0;0" keyTimes="0;.5;.5;1" dur="1.1s" begin="{T:.2f}s" repeatCount="indefinite"/></rect>
+<text x="{W - 20}" y="38" class="s" text-anchor="end">// {esc(sub)}</text>
+<rect x="20" y="56" width="{W - 40}" height="1" fill="#21262d"/>
+<rect x="20" y="55" width="{W * 0.42:.0f}" height="3" rx="1.5" fill="url(#ul)">
+  <animate attributeName="width" values="0;{W * 0.42:.0f}" dur="1.2s" begin=".2s" fill="freeze"/></rect>
+<rect y="55.5" width="60" height="2" rx="1" fill="url(#pk)"><animate attributeName="x" values="-60;{W}" dur="5s" begin="1.4s" repeatCount="indefinite"/></rect>
+</svg>
+"""
+
+
+# ---------------------------------------------------------------- principles
+
+PRINCIPLES = [
+    ("money", "is stored as integer minor units, never floats", "ledgerline, bank-management-system"),
+    ("concurrency", "claims a revision or rolls back; no lost updates", "aftermark, ledgerline"),
+    ("approvals", "need someone other than the author", "aftermark, ledgerline"),
+    ("history", "is append-only and hash-linked, so tampering shows", "ledgerline, aftermark"),
+    ("uncertainty", "is reported as 'needs review', never guessed away", "Pactrail, tracebench"),
+    ("shipping", "means typecheck, test, build and audit on every push", "every featured repo"),
+]
+
+
+def build_principles() -> str:
+    W, lh, top = 960, 30, 128
+    n = len(PRINCIPLES)
+    H = top + n * lh + 90
+    step, start = 0.42, 0.9
+    T = start + n * step + 1.6
+    rows = []
+    for i, (key, rule, where) in enumerate(PRINCIPLES):
+        y = top + i * lh
+        a = start + i * step
+        spin = (f'<g opacity="0"><animate attributeName="opacity" values="0;0;1;1;0;0" '
+                f'keyTimes="{kt(0, (a - step) / T, (a - step) / T, a / T, a / T, 1)}" dur="{T:.2f}s" fill="freeze"/>'
+                f'<circle cx="48" cy="{y - 5}" r="5.5" fill="none" stroke="{AMBER}" stroke-width="2" stroke-dasharray="20 15">'
+                f'<animateTransform attributeName="transform" type="rotate" from="0 48 {y - 5}" to="360 48 {y - 5}" dur=".6s" repeatCount="indefinite"/></circle></g>')
+        rows.append(
+            f'{spin}<g><animate attributeName="opacity" values="0;0;1;1" keyTimes="{kt(0, a / T, a / T + 0.01, 1)}" dur="{T:.2f}s" fill="freeze"/>'
+            f'<path d="M43,{y - 5} l3.5,3.5 l6.5,-7" fill="none" stroke="{GREEN}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>'
+            f'<text x="66" y="{y}" class="m"><tspan fill="{CYAN}">{esc(key)}</tspan> <tspan fill="#c9d1d9">{esc(rule)}</tspan></text>'
+            f'<text x="{W - 40}" y="{y}" class="ms" text-anchor="end">{esc(where)}</text></g>')
+    ys = top + n * lh + 18
+    done = (start + n * step) / T
+    bar_w = W - 80
+    return f"""{svg_open(W, H, "How I build, as a passing test suite: " + "; ".join(f"{k} {r}" for k, r, _ in PRINCIPLES))}
+<style>
+  .h{{fill:#e6edf3;font:600 14px {MONO}}} .c{{fill:#6e7681;font:13px {MONO}}} .m{{font:13.5px {MONO}}}
+  .ms{{fill:#6e7681;font:12px {MONO}}} .file{{fill:#e6edf3;font:600 13px {MONO}}}
+  .sum{{font:600 13px {MONO}}} .pass{{fill:#0d1117;font:700 12px {MONO}}}
+  .hd{{fill:#6e7681;font:600 10.5px {MONO};letter-spacing:1px}}
+</style>
+<rect width="{W}" height="{H}" rx="20" fill="#0d1117"/>
+<rect x=".5" y=".5" width="{W - 1}" height="{H - 1}" rx="20" fill="none" stroke="#30363d"/>
+<text x="34" y="44" class="h"><tspan fill="{VIOLET}">$</tspan> npx vitest run principles.spec.ts</text>
+<line x1="20" y1="62" x2="{W - 20}" y2="62" stroke="#21262d"/>
+<g><animate attributeName="opacity" values="0;0;1;1" keyTimes="{kt(0, 0.5 / T, 0.5 / T + 0.01, 1)}" dur="{T:.2f}s" fill="freeze"/>
+<rect x="34" y="{top - 46}" width="44" height="20" rx="4" fill="{GREEN}"/><text x="56" y="{top - 32}" class="pass" text-anchor="middle">PASS</text>
+<text x="88" y="{top - 32}" class="file">principles.spec.ts <tspan class="c">› how I build</tspan></text>
+<text x="{W - 40}" y="{top - 32}" class="hd" text-anchor="end">ENFORCED IN</text></g>
+{''.join(rows)}
+<rect x="40" y="{ys}" width="{bar_w}" height="4" rx="2" fill="#21262d"/>
+<rect x="40" y="{ys}" width="{bar_w}" height="4" rx="2" fill="{GREEN}">
+  <animate attributeName="width" values="0;0;{bar_w};{bar_w}" keyTimes="{kt(0, start / T, done, 1)}" dur="{T:.2f}s" fill="freeze"/></rect>
+<g><animate attributeName="opacity" values="0;0;1;1" keyTimes="{kt(0, done, done + 0.01, 1)}" dur="{T:.2f}s" fill="freeze"/>
+<text xml:space="preserve" x="40" y="{ys + 34}" class="sum"><tspan fill="#6e7681">Tests  </tspan><tspan fill="{GREEN}">{n} passed</tspan><tspan fill="#6e7681"> ({n})   ·   Invariants broken  </tspan><tspan fill="{GREEN}">0</tspan></text>
+<text x="{W - 40}" y="{ys + 34}" class="ms" text-anchor="end">exit 0</text></g>
+</svg>
+"""
+
+
 # ---------------------------------------------------------------- footer
 
 def build_footer(user: str) -> str:
@@ -697,6 +908,13 @@ def main() -> int:
     (ASSETS / "stack.svg").write_text(build_stack(prof), encoding="utf-8")
     (ASSETS / "footer.svg").write_text(build_footer(args.user), encoding="utf-8")
     (ASSETS / "heartbeat.svg").write_text(build_heartbeat(prof), encoding="utf-8")
+    (ASSETS / "divider.svg").write_text(build_divider(), encoding="utf-8")
+    (ASSETS / "principles.svg").write_text(build_principles(), encoding="utf-8")
+    trace_file = ROOT / "data" / "last-trace.json"
+    if trace_file.exists():  # the API writes the trace; the daily job only re-renders it
+        (ASSETS / "trace.svg").write_text(build_trace(json.loads(trace_file.read_text(encoding="utf-8"))), encoding="utf-8")
+    for slug, code, title, sub in HEADINGS:
+        (ASSETS / f"h-{slug}.svg").write_text(build_heading(code, title, sub), encoding="utf-8")
     (ASSETS / "access-log.svg").write_text(build_access_log(load_log(), args.user), encoding="utf-8")
     for p in PROJECTS:
         (ASSETS / f"card-{p['slug']}.svg").write_text(build_card(p, ci[p["slug"]]), encoding="utf-8")

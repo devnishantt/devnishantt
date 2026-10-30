@@ -4,7 +4,9 @@
 Open an issue titled like `GET /projects/ledgerline` on this repository. The `profile-api`
 workflow runs this script, which answers in a comment formatted as an HTTP response,
 closes the issue, appends the call to data/access-log.json and redraws
-assets/access-log.svg so the README shows the request.
+assets/access-log.svg so the README shows the request. It also traces itself: queue time and
+runner steps come from the Actions API, handler and GitHub API spans are timed in-process,
+and the waterfall is written to assets/trace.svg.
 
 The issue title is untrusted input. It is read from the event payload file (never
 interpolated into a shell), matched against a fixed route table and echoed only inside
@@ -19,6 +21,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import secrets
 import subprocess
 import sys
 import time
@@ -35,9 +38,70 @@ REASONS = {200: "OK", 201: "Created", 400: "Bad Request", 403: "Forbidden", 404:
 MAX_LOG = 60
 
 
+# ---------------------------------------------------------------- tracing
+
+class Tracer:
+    """Collects wall-clock spans; converted to offsets from the issue's creation when rendered."""
+
+    def __init__(self) -> None:
+        self.spans: list[dict] = []
+        self.depth = 0
+
+    def span(self, svc: str, name: str):
+        tracer = self
+
+        class _Span:
+            def __enter__(self):
+                self.rec = {"svc": svc, "name": name, "start": time.time(), "end": None, "depth": tracer.depth}
+                tracer.spans.append(self.rec)
+                tracer.depth += 1
+                return self.rec
+
+            def __exit__(self, *exc):
+                tracer.depth -= 1
+                self.rec["end"] = time.time()
+                return False
+
+        return _Span()
+
+
+TRACER = Tracer()
+
+
+def call_name(url: str) -> str:
+    if "/graphql" in url:
+        return "graphql profile"
+    m = re.search(r"/repos/[^/]+/([^/]+)/actions/runs", url)
+    if m:
+        return f"runs {m.group(1)}"
+    m = re.search(r"/issues/(\d+)/comments", url)
+    if m:
+        return f"comment #{m.group(1)}"
+    m = re.search(r"/issues/(\d+)$", url)
+    if m:
+        return f"close #{m.group(1)}"
+    return url.rsplit("/", 1)[-1][:18]
+
+
+_raw_request = bp.request
+
+
+def traced_request(url: str, token: str, data: bytes | None = None) -> dict:
+    with TRACER.span("github.api", call_name(url)):
+        return _raw_request(url, token, data)
+
+
+bp.request = traced_request
+
+
 # ---------------------------------------------------------------- GitHub REST
 
 def api(method: str, path: str, token: str, body: dict | None = None) -> dict:
+    with TRACER.span("github.api", call_name(path)):
+        return _api(method, path, token, body)
+
+
+def _api(method: str, path: str, token: str, body: dict | None = None) -> dict:
     req = urllib.request.Request(
         f"https://api.github.com{path}", method=method,
         data=json.dumps(body).encode() if body is not None else None,
@@ -142,10 +206,10 @@ def parse(title: str) -> tuple[str, str] | None:
 
 # ---------------------------------------------------------------- response
 
-def render(status: int, payload: dict, method: str, path: str, rtt: int, n: int) -> str:
+def render(status: int, payload: dict, method: str, path: str, rtt: int, n: int, trace_id: str) -> str:
     reason = REASONS.get(status, "")
     head = [f"HTTP/1.1 {status} {reason}", "content-type: application/json; charset=utf-8",
-            f"x-request-id: req_{n:05d}", "x-served-by: github-actions",
+            f"x-request-id: req_{n:05d}", f"x-trace-id: {trace_id}", "x-served-by: github-actions",
             f"x-response-time: {bp.fmt_rtt(rtt)}"]
     body = "" if method == "HEAD" else json.dumps(payload, indent=2, ensure_ascii=False)
     safe = f"{method} {path}".replace("`", "'")
@@ -155,9 +219,77 @@ def render(status: int, payload: dict, method: str, path: str, rtt: int, n: int)
         parts.append(f"```json\n{body}\n```")
     parts.append(f"<sub>Served by <a href=\"https://github.com/{REPO}/blob/main/scripts/profile_api.py\">"
                  f"<code>scripts/profile_api.py</code></a> in GitHub Actions. This request now appears in the "
-                 f"access log on the <a href=\"https://github.com/{USER}\">profile</a>. "
+                 f"access log on the <a href=\"https://github.com/{USER}\">profile</a>, and its trace replaces the one shown there. "
                  f"Try another: <code>GET /projects</code>, <code>GET /ci</code>, <code>BREW /coffee</code>.</sub>")
     return "\n\n".join(parts)
+
+
+# ---------------------------------------------------------------- trace assembly
+
+TRACE_FILE = bp.ROOT / "data" / "last-trace.json"
+MAX_CALLS = 3
+
+
+def ts(value: str) -> float:
+    return datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp()
+
+
+def actions_spans(token: str) -> tuple[list[dict], float | None]:
+    """Queue time and finished steps of this very job, read back from the Actions API (1 s resolution)."""
+    run_id, attempt = os.environ.get("GITHUB_RUN_ID"), os.environ.get("GITHUB_RUN_ATTEMPT", "1")
+    if not run_id:
+        return [], None
+    try:
+        jobs = _raw_request(f"https://api.github.com/repos/{REPO}/actions/runs/{run_id}/attempts/{attempt}/jobs",
+                            token).get("jobs") or []
+    except Exception as exc:
+        print(f"warning: jobs lookup: {exc}", file=sys.stderr)
+        return [], None
+    if not jobs:
+        return [], None
+    job = jobs[0]
+    out, names = [], {"Set up job": "set up job", "Run actions/checkout@v4": "checkout",
+                      "Run actions/setup-python@v5": "setup-python"}
+    for step in job.get("steps", []):
+        if step["name"] in names and step.get("started_at") and step.get("completed_at"):
+            out.append({"svc": "runner", "name": names[step["name"]], "start": ts(step["started_at"]),
+                        "end": ts(step["completed_at"]), "depth": 1, "coarse": True})
+    return out, ts(job["started_at"]) if job.get("started_at") else None
+
+
+def assemble_trace(t0: float, now: float, job_start: float | None, steps: list[dict],
+                   request: str, caller: str, trace_id: str) -> dict:
+    spans: list[dict] = [{"svc": "github", "name": "issues.opened", "start": t0, "end": t0, "depth": 0}]
+    if job_start:
+        spans.append({"svc": "actions", "name": "queued", "start": t0, "end": job_start, "depth": 0, "coarse": True})
+        spans.append({"svc": "actions", "name": "job respond", "start": job_start, "end": None, "depth": 0})
+    spans += steps
+    calls = 0
+    folded: dict | None = None
+    for sp in TRACER.spans:
+        sp = dict(sp, depth=sp["depth"] + 1)
+        if sp["svc"] == "github.api":
+            calls += 1
+            if calls > MAX_CALLS and folded is None:
+                folded = dict(sp, name="more calls", n=1)
+                spans.append(folded)
+                continue
+            if folded is not None and sp["depth"] == folded["depth"]:
+                folded["n"] += 1
+                folded["end"] = sp["end"]
+                folded["name"] = f"+{folded['n']} more calls"
+                continue
+        else:
+            folded, calls = None, 0
+        spans.append(sp)
+    spans.append({"svc": "log", "name": "commit + push", "start": now, "end": None, "depth": 1})
+    rel = [dict(sp, start=round(sp["start"] - t0, 3),
+                end=None if sp["end"] is None else round(sp["end"] - t0, 3)) for sp in spans]
+    for sp in rel:
+        sp.pop("n", None)
+    return {"trace_id": trace_id, "request": request, "caller": caller,
+            "at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "total": round(now - t0 + 2.0, 3), "spans": rel}
 
 
 # ---------------------------------------------------------------- access log
@@ -166,7 +298,7 @@ def git(*args: str) -> str:
     return subprocess.run(["git", *args], check=True, capture_output=True, text=True).stdout
 
 
-def record(entry: dict) -> None:
+def record(entry: dict, trace: dict | None = None) -> None:
     """Append to the log and push. Re-reads from origin on every attempt, so concurrent runs never conflict."""
     for attempt in range(6):
         git("fetch", "--quiet", "origin", "main")
@@ -177,7 +309,12 @@ def record(entry: dict) -> None:
         bp.LOG_FILE.parent.mkdir(exist_ok=True)
         bp.LOG_FILE.write_text(json.dumps(log, indent=1) + "\n", encoding="utf-8")
         (bp.ASSETS / "access-log.svg").write_text(bp.build_access_log(log, USER), encoding="utf-8")
-        git("add", str(bp.LOG_FILE), str(bp.ASSETS / "access-log.svg"))
+        files = [str(bp.LOG_FILE), str(bp.ASSETS / "access-log.svg")]
+        if trace is not None:
+            TRACE_FILE.write_text(json.dumps(trace, indent=1) + "\n", encoding="utf-8")
+            (bp.ASSETS / "trace.svg").write_text(bp.build_trace(trace), encoding="utf-8")
+            files += [str(TRACE_FILE), str(bp.ASSETS / "trace.svg")]
+        git("add", *files)
         git("commit", "--quiet", "-m", f"chore(api): {entry['method']} {entry['path']} -> {entry['status']}")
         if subprocess.run(["git", "push", "--quiet", "origin", "HEAD:main"]).returncode == 0:
             return
@@ -196,7 +333,11 @@ def main() -> int:
     event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text(encoding="utf-8"))
     issue = event["issue"]
     caller = issue["user"]["login"]
-    parsed = parse(issue["title"])
+    trace_id = secrets.token_hex(8)
+    handler = TRACER.span("python", "handle request")
+    handler.__enter__()
+    with TRACER.span("api", "parse"):
+        parsed = parse(issue["title"])
     if parsed is None:
         method, path = "GET", "/?"
         status, payload = 400, {"error": "Bad Request",
@@ -205,7 +346,8 @@ def main() -> int:
     else:
         method, path = parsed
         try:
-            status, payload = route(method, path, token)
+            with TRACER.span("api", f"route {method} {path}"[:26]):
+                status, payload = route(method, path, token)
         except Exception as exc:  # a failing lookup is still answered
             print(f"route error: {exc}", file=sys.stderr)
             status, payload = 200, {"note": "Upstream lookup failed; try again shortly."}
@@ -215,12 +357,16 @@ def main() -> int:
     n = bp.load_log()["served"] + 1
     num = issue["number"]
     api("POST", f"/repos/{REPO}/issues/{num}/comments", token,
-        {"body": render(status, payload, method, path, rtt, n)})
+        {"body": render(status, payload, method, path, rtt, n, trace_id)})
     api("PATCH", f"/repos/{REPO}/issues/{num}", token,
         {"state": "closed", "state_reason": "completed" if status < 400 or status == 418 else "not_planned"})
+    handler.__exit__(None, None, None)
 
+    steps, job_start = actions_spans(token)
+    trace = assemble_trace(created.timestamp(), time.time(), job_start, steps,
+                           f"{method} {path}", caller, trace_id)
     record({"at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "user": caller,
-            "method": method, "path": path[:60], "status": status, "rtt": rtt})
+            "method": method, "path": path[:60], "status": status, "rtt": rtt}, trace)
     print(f"{caller}: {method} {path} -> {status} in {rtt}s")
     return 0
 

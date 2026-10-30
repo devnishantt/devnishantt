@@ -8,13 +8,24 @@
   and CI that typechecks, tests and builds on every push.
 </p>
 
-<br>
+<p align="center">
+  <a href="#call"><code>call the api</code></a> &nbsp;·&nbsp;
+  <a href="#work"><code>projects</code></a> &nbsp;·&nbsp;
+  <a href="#ci"><code>pipelines</code></a> &nbsp;·&nbsp;
+  <a href="#vitals"><code>vital signs</code></a> &nbsp;·&nbsp;
+  <a href="#rules"><code>how i build</code></a> &nbsp;·&nbsp;
+  <a href="#tools"><code>toolbox</code></a>
+</p>
 
-## 🔌 This profile is an API. Call it.
+<p align="center"><img src="assets/divider.svg" width="100%" alt=""></p>
+
+<a id="call"></a>
+<p align="center"><img src="assets/h-api.svg" width="100%" alt="0x01 this profile is an api: call it from the issues tab"></p>
 
 This README is served by a backend. **Open an issue whose title is an HTTP request** and a GitHub Action answers it
-with a real HTTP-style response (status line, headers, JSON body) within about 20 seconds. Then it closes the issue and
-writes your call into the access log below. No server, no keys: the transport is GitHub Issues.
+with an HTTP-style response (status line, headers, JSON body) in about 10 to 20 seconds. It then closes the issue,
+writes your call into the access log below, and replaces the trace further down with a span-by-span waterfall of
+*your* request. No server and no keys: the transport is GitHub Issues.
 
 <table>
   <tr>
@@ -27,12 +38,18 @@ writes your call into the access log below. No server, no keys: the transport is
   <tr><td><a href="https://github.com/devnishantt/devnishantt/issues/new?title=GET%20/ci&body=Just%20press%20%2A%2ACreate%2A%2A%20%E2%80%94%20this%20issue%20is%20an%20HTTP%20request.%20A%20GitHub%20Action%20answers%20it%20in%20about%2020%20seconds%2C%20closes%20it%2C%20and%20adds%20you%20to%20the%20access%20log%20on%20my%20profile.%0A%0AChange%20the%20title%20to%20call%20any%20route%3A%20GET%20/%2C%20GET%20/about%2C%20GET%20/projects%2C%20GET%20/projects/%7Bname%7D%2C%20GET%20/ci%2C%20GET%20/stack%2C%20GET%20/now%2C%20OPTIONS%20/%2C%20BREW%20/coffee"><code>GET&nbsp;/ci</code></a></td><td>Every pipeline, read live from GitHub Actions</td></tr>
   <tr><td><a href="https://github.com/devnishantt/devnishantt/issues/new?title=GET%20/now&body=Just%20press%20%2A%2ACreate%2A%2A%20%E2%80%94%20this%20issue%20is%20an%20HTTP%20request.%20A%20GitHub%20Action%20answers%20it%20in%20about%2020%20seconds%2C%20closes%20it%2C%20and%20adds%20you%20to%20the%20access%20log%20on%20my%20profile.%0A%0AChange%20the%20title%20to%20call%20any%20route%3A%20GET%20/%2C%20GET%20/about%2C%20GET%20/projects%2C%20GET%20/projects/%7Bname%7D%2C%20GET%20/ci%2C%20GET%20/stack%2C%20GET%20/now%2C%20OPTIONS%20/%2C%20BREW%20/coffee"><code>GET&nbsp;/now</code></a></td><td>Streak and contributions, computed when you ask</td></tr>
   <tr><td><a href="https://github.com/devnishantt/devnishantt/issues/new?title=DELETE%20/&body=Just%20press%20%2A%2ACreate%2A%2A%20%E2%80%94%20this%20issue%20is%20an%20HTTP%20request.%20A%20GitHub%20Action%20answers%20it%20in%20about%2020%20seconds%2C%20closes%20it%2C%20and%20adds%20you%20to%20the%20access%20log%20on%20my%20profile.%0A%0AChange%20the%20title%20to%20call%20any%20route%3A%20GET%20/%2C%20GET%20/about%2C%20GET%20/projects%2C%20GET%20/projects/%7Bname%7D%2C%20GET%20/ci%2C%20GET%20/stack%2C%20GET%20/now%2C%20OPTIONS%20/%2C%20BREW%20/coffee"><code>DELETE&nbsp;/</code></a></td><td><code>403</code>. This profile is append-only, like a good audit log</td></tr>
-  <tr><td><a href="https://github.com/devnishantt/devnishantt/issues/new?title=BREW%20/coffee&body=Just%20press%20%2A%2ACreate%2A%2A%20%E2%80%94%20this%20issue%20is%20an%20HTTP%20request.%20A%20GitHub%20Action%20answers%20it%20in%20about%2020%20seconds%2C%20closes%20it%2C%20and%20adds%20you%20to%20the%20access%20log%20on%20my%20profile.%0A%0AChange%20the%20title%20to%20call%20any%20route%3A%20GET%20/%2C%20GET%20/about%2C%20GET%20/projects%2C%20GET%20/projects/%7Bname%7D%2C%20GET%20/ci%2C%20GET%20/stack%2C%20GET%20/now%2C%20OPTIONS%20/%2C%20BREW%20/coffee"><code>BREW&nbsp;/coffee</code></a></td><td>Try it 🫖</td></tr>
+  <tr><td><a href="https://github.com/devnishantt/devnishantt/issues/new?title=BREW%20/coffee&body=Just%20press%20%2A%2ACreate%2A%2A%20%E2%80%94%20this%20issue%20is%20an%20HTTP%20request.%20A%20GitHub%20Action%20answers%20it%20in%20about%2020%20seconds%2C%20closes%20it%2C%20and%20adds%20you%20to%20the%20access%20log%20on%20my%20profile.%0A%0AChange%20the%20title%20to%20call%20any%20route%3A%20GET%20/%2C%20GET%20/about%2C%20GET%20/projects%2C%20GET%20/projects/%7Bname%7D%2C%20GET%20/ci%2C%20GET%20/stack%2C%20GET%20/now%2C%20OPTIONS%20/%2C%20BREW%20/coffee"><code>BREW&nbsp;/coffee</code></a></td><td>See RFC 2324</td></tr>
 </table>
 
 <p align="center">
   <img src="assets/access-log.svg" width="100%" alt="Access log: the most recent requests made to this profile API, with caller, method, path, status code and how long the reply took.">
 </p>
+
+<p align="center">
+  <img src="assets/trace.svg" width="100%" alt="Distributed trace of the most recent API request: issue event, Actions queue time, runner steps, the Python handler, each GitHub API call, and the commit that published this image.">
+</p>
+
+<p align="center"><sub>The trace is real. Queue time and runner steps are read back from the Actions API; the handler and every GitHub API call are timed in-process. The striped span is still running when the image is committed, because that commit is what publishes it.</sub></p>
 
 <details>
 <summary><b>How it works</b></summary>
@@ -53,7 +70,8 @@ sequenceDiagram
     R->>G: latest CI run for the repo
     G-->>R: status, commit, duration
     R->>I: comment with HTTP/1.1 200 OK + JSON, close issue
-    R->>A: append to data/access-log.json, redraw access-log.svg
+    R->>G: read this job's own step timings
+    R->>A: commit access log + trace waterfall
     A-->>You: your request shows up on this README
 ```
 
@@ -64,9 +82,10 @@ sequenceDiagram
 
 </details>
 
-<br>
+<p align="center"><img src="assets/divider.svg" width="100%" alt=""></p>
 
-## ⚡ What I'm building
+<a id="work"></a>
+<p align="center"><img src="assets/h-work.svg" width="100%" alt="0x02 what i'm building: six backends, each with one hard problem"></p>
 
 <table>
   <tr>
@@ -98,9 +117,10 @@ sequenceDiagram
 
 </details>
 
-<br>
+<p align="center"><img src="assets/divider.svg" width="100%" alt=""></p>
 
-## 🟢 Live CI board
+<a id="ci"></a>
+<p align="center"><img src="assets/h-ci.svg" width="100%" alt="0x03 pipelines: latest main-branch run, every repo"></p>
 
 <p align="center">
   <img src="assets/pipeline.svg" width="100%" alt="The latest main-branch GitHub Actions run for each featured project, with its steps, duration and result.">
@@ -108,38 +128,32 @@ sequenceDiagram
 
 <p align="center"><sub>Read straight from the GitHub Actions API every day. If a pipeline goes red, this board goes red with it.</sub></p>
 
-<br>
+<p align="center"><img src="assets/divider.svg" width="100%" alt=""></p>
 
-## 💓 Vital signs
+<a id="vitals"></a>
+<p align="center"><img src="assets/h-vitals.svg" width="100%" alt="0x04 vital signs: contributions as a monitor trace"></p>
 
 <p align="center">
   <img src="assets/heartbeat.svg" width="100%" alt="My daily contributions over the last four weeks drawn as an ECG trace, with the 7-day total, current streak and busiest day.">
 </p>
 
-<br>
+<p align="center"><img src="assets/divider.svg" width="100%" alt=""></p>
 
-## 🧭 How I build
+<a id="rules"></a>
+<p align="center"><img src="assets/h-rules.svg" width="100%" alt="0x05 how i build: invariants over features"></p>
 
-```ts
-const principles = {
-  money:       "integers in minor units, never floats",
-  concurrency: "claim a revision or roll back; no lost updates",
-  approvals:   "the person who opens it is not the person who signs it off",
-  history:     "append-only and hash-linked, so tampering shows",
-  uncertainty: "say 'needs review' or 'incomparable' instead of guessing",
-  shipping:    "typecheck, test, build and audit on every push",
-} as const;
-```
+<p align="center">
+  <img src="assets/principles.svg" width="100%" alt="How I build, rendered as a passing test run: money as integer minor units, revision claims for concurrency, approvals by someone other than the author, append-only hash-linked history, uncertainty reported instead of guessed, and CI on every push. Each line names the repositories that enforce it.">
+</p>
 
-<br>
+<p align="center"><img src="assets/divider.svg" width="100%" alt=""></p>
 
-## 🛠 Toolbox
+<a id="tools"></a>
+<p align="center"><img src="assets/h-tools.svg" width="100%" alt="0x06 toolbox: what the above is made of"></p>
 
 <p align="center">
   <img src="assets/stack.svg" width="100%" alt="Tools I use: TypeScript, JavaScript, Node.js, Python, Express, Fastify, Hono, Bun, React, Zod, Prisma, PostgreSQL, Redis, Cloudflare, DuckDB, Pydantic, Vitest, Pytest, Docker, GitHub Actions, MySQL, MongoDB, Git and GitHub, plus the language split of my public repositories.">
 </p>
-
-<br>
 
 <p align="center">
   <img src="assets/footer.svg" width="100%" alt="exit 0. Thanks for stopping by.">
