@@ -164,7 +164,8 @@ def route(method: str, path: str, token: str) -> tuple[int, dict]:
                      "languages": ["TypeScript", "JavaScript", "Python"],
                      "focus": ["correctness under concurrency", "money and ledgers",
                                "auditability", "CI on every repository"],
-                     "github": f"https://github.com/{USER}"}
+                     "github": f"https://github.com/{USER}",
+                     "portfolio": f"https://{USER}.github.io"}
     if path == "/projects":
         return 200, {"count": len(bp.PROJECTS),
                      "projects": [{"name": p["name"], "path": f"/projects/{p['slug']}", "summary": p["tag"]}
