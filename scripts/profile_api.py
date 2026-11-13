@@ -165,7 +165,7 @@ def route(method: str, path: str, token: str) -> tuple[int, dict]:
                      "focus": ["correctness under concurrency", "money and ledgers",
                                "auditability", "CI on every repository"],
                      "github": f"https://github.com/{USER}",
-                     "portfolio": f"https://{USER}.github.io"}
+                     "portfolio": "https://devnishantt.vercel.app"}
     if path == "/projects":
         return 200, {"count": len(bp.PROJECTS),
                      "projects": [{"name": p["name"], "path": f"/projects/{p['slug']}", "summary": p["tag"]}

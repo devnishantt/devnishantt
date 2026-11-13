@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://devnishantt.github.io"><b>devnishantt.github.io</b></a>: a portfolio you attack instead of read. Race a withdrawal, replay a payment, tamper with an audit log.
+  <a href="https://devnishantt.vercel.app"><b>devnishantt.vercel.app</b></a>: a portfolio you attack instead of read. Race a withdrawal, replay a payment, tamper with an audit log.
 </p>
 
 <p align="center">
