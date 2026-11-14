@@ -13,10 +13,6 @@
 </p>
 
 <p align="center">
-  <sub>Currently learning how shader languages translate into each other, by fixing importer bugs in <a href="https://github.com/CrossGL/crosstl">CrossTL</a>.</sub>
-</p>
-
-<p align="center">
   <a href="#call"><code>call the api</code></a> &nbsp;·&nbsp;
   <a href="#work"><code>projects</code></a> &nbsp;·&nbsp;
   <a href="#ci"><code>pipelines</code></a> &nbsp;·&nbsp;
